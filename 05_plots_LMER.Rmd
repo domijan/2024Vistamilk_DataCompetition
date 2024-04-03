@@ -1,0 +1,71 @@
+---
+title: "EDA plots"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+library(readxl)
+library(tidyverse)
+
+path <- "data/train_dataset.xlsx"
+path2 <- "data/reference values.xlsx"
+sheets <- excel_sheets(path)
+
+specTrain <- NULL
+for(i in 1:length(sheets)){
+  spec <- readxl::read_excel(path, sheet = sheets[i])
+  spec <- spec |>
+  mutate(`sample number` = rep(sheets[i], nrow(spec)))
+  specTrain <- rbind(specTrain, spec)
+}
+
+labels <- readxl::read_excel(path2, sheet = excel_sheets(path2))
+# specTrain |> glimpse()
+specTrain <- specTrain |> left_join(labels)
+
+# labels$`lactose content` |> table()
+tbl <- sort(unique(labels$`lactose content`))
+```
+
+```{r}
+dat <- specTrain |>
+  mutate(ID = 1:nrow(specTrain)) |>
+  # mutate(`sample number` = fct_reorder(as.factor(`sample number`), `lactose content`)) |>
+  pivot_longer(-c(ID, `sample number`, `lactose content`)) |>
+  mutate(name = as.numeric(name)) |>
+  filter(name < 3907)
+
+dat <- dat |> rename(sample = `sample number`, lactose = `lactose content`)
+dat <- dat |> mutate(lactose = as.factor(lactose), ID = as.factor(ID), sample = as.factor(sample))
+
+```
+
+```{r}
+library(mgcv)
+```
+
+
+```{r}
+gam_fit <- gam(value ~ 
+                 s(name) + 
+                 s(ID, bs='re'),
+               data = dat |> filter (sample== levels(dat$sample)[1]), 
+               method = 'REML')
+```
+
+
+```{r}
+# pc <- specTrain |> select(-c(`sample number`, `lactose content`)) |>
+pc <- specTrain |> select(`412.71`: `3907.24`) |>
+  prcomp(center = TRUE,
+            scale. = TRUE)
+```
+

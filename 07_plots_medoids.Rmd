@@ -1,0 +1,133 @@
+---
+title: "EDA plots"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+library(readxl)
+library(tidyverse)
+
+path <- "data/train_dataset.xlsx"
+path2 <- "data/reference values.xlsx"
+sheets <- excel_sheets(path)
+
+specTrain <- NULL
+for(i in 1:length(sheets)){
+  spec <- readxl::read_excel(path, sheet = sheets[i])
+  spec <- spec |>
+  mutate(`sample number` = rep(sheets[i], nrow(spec)))
+  specTrain <- rbind(specTrain, spec)
+}
+
+labels <- readxl::read_excel(path2, sheet = excel_sheets(path2))
+# specTrain |> glimpse()
+specTrain <- specTrain |> left_join(labels)
+
+# labels$`lactose content` |> table()
+tbl <- sort(unique(labels$`lactose content`))
+```
+
+```{r}
+dat <- specTrain |> select(c(`412.71`: `3907.24`, `sample number`))
+
+
+dat <- dat |> rename(sample = `sample number`)
+tbl <- unique(dat$sample)
+
+
+
+```
+
+
+<!-- ```{r} -->
+<!-- datt <- dat |>  -->
+<!--   filter(sample== tbl[1]) -->
+
+<!-- datt$mahalanobis <- mahalanobis(datt|> select(-sample), colMeans(datt|> select(-sample)), cov(datt|> select(-sample))) -->
+<!-- ``` -->
+
+```{r fig.width= 2, fig.height= 2}
+library(GDAtools)
+
+medoiddat <- NULL
+for (i in 1: length(tbl)){
+  
+d <- dist(dat|> filter(sample== tbl[i]) |> select(-sample))
+clus <- cutree(hclust(d), 1)
+meds <- medoids(d, clus )
+
+
+datt <- dat |> 
+  filter(sample== tbl[i])
+
+medoiddat <- rbind(medoiddat, datt[meds,])
+p1 <- datt|>
+  mutate(ID = 1:nrow(datt)) |>
+  pivot_longer(-c(ID, sample)) |>
+  mutate(name = as.numeric(name)) |>
+  mutate(medoid = as.factor(ID ==meds)) |>
+  ggplot(aes(x = name, y = value, group = ID, col = medoid)) +
+  geom_line(aes(alpha= medoid)) +
+  theme(legend.position="none")
+print(p1)
+}
+```
+
+
+```{r}
+medoiddat  <- medoiddat |> left_join(labels|> rename(sample = `sample number`))
+
+medoiddat|>
+  pivot_longer(-c(`lactose content`, sample)) |>
+  mutate(name = as.numeric(name)) |>
+  ggplot(aes(x = name, y = value, group = sample, col = as.factor(`lactose content`))) +
+  geom_line() +
+  facet_wrap(~as.factor(`lactose content`))
+
+```
+
+```{r}
+pc <- medoiddat |> select(`412.71`: `3907.24`) |>
+  prcomp(center = TRUE,
+            scale. = TRUE)
+```
+
+```{r}
+library(broom)
+pc |>
+  tidy(matrix = "eigenvalues") |>
+  filter(PC < 8) |>
+  ggplot(aes(PC, percent)) +
+  geom_col(fill = "#56B4E9", alpha = 0.8)
+```
+
+```{r}
+pc |> 
+  augment(medoiddat) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`))) + 
+  geom_point()
+
+pc |> 
+  augment(medoiddat) |>
+  ggplot(aes(.fittedPC1, .fittedPC3, color =(`lactose content`))) + 
+  geom_point()
+
+library(GGally)
+pc |> 
+  augment(medoiddat) |> 
+  select(c(.fittedPC1: .fittedPC6, `lactose content`)) |>
+  ggpairs(columns = 1:6, aes(colour = as.factor(`lactose content`)))
+
+
+
+
+```
+
