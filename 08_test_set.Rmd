@@ -1,0 +1,200 @@
+---
+title: "EDA plots"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(broom)
+
+
+path3 <- "data/test_dataset.xlsx"
+sheets <- excel_sheets(path3)
+
+specTest <- NULL
+for(i in 1:length(sheets)){
+  spec <- readxl::read_excel(path3, sheet = sheets[i])
+  spec <- spec |>
+  mutate(`sample number` = rep(sheets[i], nrow(spec)))
+  specTest <- rbind(specTest, spec)
+}
+
+medoiddat <- readRDS("medoiddat.rds")
+specTrain <- readRDS("specTrain.rds")
+# specTest |> glimpse()
+
+saveRDS(specTest, file = "specTest.rds")
+
+```
+
+
+
+```{r eval = FALSE}
+p1 <- specTest |>
+  mutate(ID = 1:nrow(specTest)) |>
+  pivot_longer(-c(ID, `sample number`)) |>
+  mutate(name = as.numeric(name)) |>
+  ggplot(aes(x = name, y = value, group = ID, col = `sample number`)) +
+  geom_line()+
+  facet_wrap(~`sample number`)
+p1
+
+```
+
+
+```{r}
+a <- specTest |>
+  group_by(`sample number`) |> 
+  summarise(across(everything(), list(min = min, max = max))) |> 
+  pivot_longer(-c(`sample number`))
+
+a <- a |> 
+  mutate(wave  = str_split(name, "_", simplify = TRUE)[,1], 
+         name  = str_split(name, "_", simplify = TRUE)[,2])
+
+
+a <-  a |>
+  pivot_wider(names_from = name, values_from = value)
+  
+a <-  a |> mutate(wave = as.numeric(wave)) 
+
+
+```
+
+
+
+```{r}
+
+p1 <-  a |> 
+  ggplot(aes(x = wave, col = `sample number`)) +
+  geom_ribbon(aes(ymin=min, ymax=max, fill = `sample number`), alpha = 0.7) +
+  facet_wrap(~`sample number`) 
+p1
+
+```
+
+
+```{r}
+pc <- specTest |> select(`412.71`: `3907.24`) |>
+  prcomp(center = TRUE,
+            scale. = TRUE)
+
+pc |>
+  tidy(matrix = "eigenvalues") |>
+  filter(PC < 8) |>
+  ggplot(aes(PC, percent)) +
+  geom_col(fill = "#56B4E9", alpha = 0.8)
+```
+
+```{r}
+
+library(GGally)
+pc |> 
+  augment(specTest) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = `sample number`)) + 
+  geom_point(size = 0.5, alpha = 0.5)  + theme(legend.position = "none")
+
+pc |> 
+  augment(specTest) |>
+  ggplot(aes(.fittedPC2, .fittedPC3, color = `sample number`)) + 
+  geom_point(size = 0.5, alpha = 0.5)  + theme(legend.position = "none")
+  
+
+pc |> 
+  augment(specTest) |> 
+  select(c(.fittedPC1: .fittedPC4, `sample number`)) |>
+  ggpairs(columns = 1:4, aes(colour = `sample number`),
+          lower = list(continuous = wrap("points", alpha = 0.5, size = 0.2)),
+          upper = list(continuous = wrap("points", alpha = 0.5, size = 0.2))) 
+```
+
+
+```{r}
+dat <- specTest |> select(c(`412.71`: `3907.24`, `sample number`))
+
+
+dat <- dat |> rename(sample = `sample number`)
+tbl <- unique(dat$sample)
+
+```
+
+
+
+```{r fig.width= 2, fig.height= 2}
+library(GDAtools)
+
+medoidtest <- NULL
+for (i in 1: length(tbl)){
+  
+d <- dist(dat|> filter(sample== tbl[i]) |> select(-sample))
+clus <- cutree(hclust(d), 1)
+meds <- medoids(d, clus )
+
+
+datt <- dat |> 
+  filter(sample== tbl[i])
+
+medoidtest <- rbind(medoidtest, datt[meds,])
+p1 <- datt|>
+  mutate(ID = 1:nrow(datt)) |>
+  pivot_longer(-c(ID, sample)) |>
+  mutate(name = as.numeric(name)) |>
+  mutate(medoid = as.factor(ID ==meds)) |>
+  ggplot(aes(x = name, y = value, group = ID, col = medoid)) +
+  geom_line(aes(alpha= medoid)) +
+  theme(legend.position="none")
+print(p1)
+}
+```
+
+
+```{r}
+
+medoidtest|>
+  pivot_longer(-c(sample)) |>
+  mutate(name = as.numeric(name)) |>
+  ggplot(aes(x = name, y = value, group = sample, col = sample)) +
+  geom_line() 
+```
+
+```{r}
+pc <- medoidtest |> select(`412.71`: `3907.24`) |>
+  prcomp(center = TRUE,
+            scale. = TRUE)
+```
+
+```{r}
+library(broom)
+pc |>
+  tidy(matrix = "eigenvalues") |>
+  filter(PC < 8) |>
+  ggplot(aes(PC, percent)) +
+  geom_col(fill = "#56B4E9", alpha = 0.8)
+```
+
+```{r}
+pc |> 
+  augment(medoidtest) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = sample)) + 
+  geom_point()
+
+pc |> 
+  augment(medoidtest) |>
+  ggplot(aes(.fittedPC1, .fittedPC3, color = sample)) + 
+  geom_point()
+
+```
+
+```{r eval = FALSE}
+saveRDS(medoidtest, file = "medoidtest.rds")
+```
+

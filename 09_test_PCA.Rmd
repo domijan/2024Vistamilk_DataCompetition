@@ -1,0 +1,175 @@
+---
+title: "PCA plots"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(broom)
+
+
+medoidtest <- readRDS("medoidtest.rds")
+medoidtrain <- readRDS("medoiddat.rds")
+specTrain <- readRDS("specTrain.rds")
+specTest <- readRDS("specTest.rds")
+# specTest |> glimpse()
+
+
+medoidtrain |>
+  pivot_longer(-c(`lactose content`, sample)) |>
+  mutate(name = as.numeric(name)) |>
+  ggplot(aes(x = name, y = value, group = sample, col = as.factor(`lactose content`))) +
+  geom_line() +
+  facet_wrap(~as.factor(`lactose content`))
+```
+
+
+```{r}
+pc <- medoidtrain |> select(`412.71`: `3907.24`) |>
+  prcomp(center = TRUE,
+            scale. = TRUE)
+
+pc |>
+  tidy(matrix = "eigenvalues") |>
+  filter(PC < 8) |>
+  ggplot(aes(PC, percent)) +
+  geom_col(fill = "#56B4E9", alpha = 0.8)
+
+
+
+# pc |> 
+#   augment(medoidtrain) |>
+#   ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`))) +
+#   geom_point()
+# 
+# 
+# pc |> 
+#   augment(newdata = medoidtrain) |>
+#   bind_rows(pc |> 
+#   augment(newdata = medoidtest) |> mutate(`lactose content` = 0 *.fittedPC1)) |>
+#   ggplot(aes(.fittedPC1, .fittedPC2, color = as.factor((`lactose content`)))) + 
+#   geom_point() 
+
+
+
+p1 <- pc |> 
+  augment(newdata = specTrain) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`)))  + 
+  geom_point(size = 0.5, alpha = 0.5) +
+  ylim(c(-100, 100))+
+  xlim(c(-100, 150))+ 
+  theme(legend.position = "none")
+
+p2 <- pc |> 
+  augment(newdata = specTest) |> mutate(`lactose content` = 0 *.fittedPC1) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = as.factor(`sample number`)))  + 
+  geom_point(size = 0.5, alpha = 0.5) +
+  ylim(c(-100, 100))+
+  xlim(c(-100, 150))+ 
+  theme(legend.position = "none")
+
+p3 <- pc |> 
+  augment(newdata = medoidtrain) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`)))  + 
+  geom_point(size = 0.5) +
+  ylim(c(-100, 100))+
+  xlim(c(-100, 150))+ 
+  theme(legend.position = "none")
+
+p4 <- pc |> 
+  augment(newdata = medoidtest) |> mutate(`lactose content` = 0 *.fittedPC1) |>
+  ggplot(aes(.fittedPC1, .fittedPC2))  + 
+  geom_point(size = 0.5) +
+  ylim(c(-100, 100))+
+  xlim(c(-100, 150))+ 
+  theme(legend.position = "none")
+
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, ncol=2)
+
+```
+
+
+
+```{r}
+pc <- specTrain |> select(`412.71`: `3907.24`) |>
+  prcomp(center = TRUE,
+            scale. = TRUE)
+```
+
+
+```{r}
+pc |>
+  tidy(matrix = "eigenvalues") |>
+  filter(PC < 8) |>
+  ggplot(aes(PC, percent)) +
+  geom_col(fill = "#56B4E9", alpha = 0.8)
+```
+
+```{r}
+# pc |> 
+#   augment(specTrain) |>
+#   ggplot(aes(.fittedPC1, .fittedPC2, color = `sample number`)) + 
+#   geom_point(size = 0.5, alpha = 0.5)  + theme(legend.position = "none")
+# 
+# 
+# pc |> 
+#   augment(newdata = specTest) |>
+#   ggplot(aes(.fittedPC1, .fittedPC2, color = `sample number`)) + 
+  # geom_point(size = 0.5, alpha = 0.5)  + theme(legend.position = "none")
+
+# pc |> 
+#   augment(specTrain) |>
+#   bind_rows(pc |> 
+#   augment(newdata = specTest) |> mutate(`lactose content` = 0 *.fittedPC1)) |>
+#   ggplot(aes(.fittedPC1, .fittedPC2, color = as.factor((`lactose content`))))  + 
+#   geom_point(size = 0.5, alpha = 0.5) +
+#   ylim(c(-100, 100))+
+#   xlim(c(-100, 50))
+
+p1 <- pc |> 
+  augment(specTrain) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`)))  + 
+  geom_point(size = 0.5, alpha = 0.5) +
+  ylim(c(-100, 100))+
+  xlim(c(-100, 50))+ 
+  theme(legend.position = "none")
+
+p2 <- pc |> 
+  augment(newdata = specTest) |> mutate(`lactose content` = 0 *.fittedPC1) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = as.factor(`sample number`)))  + 
+  geom_point(size = 0.5, alpha = 0.5) +
+  ylim(c(-100, 100))+
+  xlim(c(-100, 50))+ 
+  theme(legend.position = "none")
+
+p3 <- pc |> 
+  augment(newdata = medoidtrain) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`)))  + 
+  geom_point(size = 0.5) +
+  ylim(c(-100, 100))+
+  xlim(c(-100, 50))+ 
+  theme(legend.position = "none")
+
+p4 <- pc |> 
+  augment(newdata = medoidtest) |> mutate(`lactose content` = 0 *.fittedPC1) |>
+  ggplot(aes(.fittedPC1, .fittedPC2))  + 
+  geom_point(size = 0.5) +
+  ylim(c(-100, 100))+
+  xlim(c(-100, 50))+ 
+  theme(legend.position = "none")
+
+
+grid.arrange(p1, p2, p3, p4, ncol=2)
+
+```
+

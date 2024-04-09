@@ -17,6 +17,7 @@ library(tidyverse)
 
 path <- "data/train_dataset.xlsx"
 path2 <- "data/reference values.xlsx"
+path3 <- "data/test_dataset.xlsx"
 sheets <- excel_sheets(path)
 
 specTrain <- NULL
@@ -129,5 +130,12 @@ pc |>
 
 
 
+```
+
+```{r eval = FALSE}
+saveRDS(medoiddat, file = "medoiddat.rds")
+saveRDS(specTrain, file = "specTrain.rds")
+medoiddat <- readRDS("medoiddat.rds")
+specTrain <- readRDS("specTrain.rds")
 ```
 

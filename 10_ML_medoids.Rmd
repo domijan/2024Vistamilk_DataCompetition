@@ -1,0 +1,310 @@
+---
+title: "ML attempts"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(broom)
+library(pls)
+library(glmnet)
+library(ranger)
+library(e1071)
+library(brnn)
+library(gbm)
+calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+
+medoidtest <- readRDS("medoidtest.rds")
+medoidtrain <- readRDS("medoiddat.rds")
+specTrain <- readRDS("specTrain.rds")
+specTest <- readRDS("specTest.rds")
+# specTest |> glimpse()
+
+
+medoidtrain |>
+  pivot_longer(-c(`lactose content`, sample)) |>
+  mutate(name = as.numeric(name)) |>
+  ggplot(aes(x = name, y = value, group = sample, col = as.factor(`lactose content`))) +
+  geom_line() +
+  facet_wrap(~as.factor(`lactose content`))
+
+
+sample <- medoidtrain$sample |> unique()
+```
+
+```{r eval = FALSE}
+corsmed <- apply(medoidtrain |> select(`412.71`: `3907.24`),2,
+      cor, medoidtrain$`lactose content`)
+corsSpec <- apply(specTrain |> select(`412.71`: `3907.24`),2,
+      cor, specTrain$`lactose content`)
+
+ plot(corsSpec, corsmed)
+ 
+  x <- model.matrix(`lactose content` ~. , 
+                   data =  specTrain |> 
+                     select(-`sample number`))
+
+ rf.fit <- ranger(y =  specTrain$`lactose content`, x = x,  importance = "impurity") 
+ 
+ rfimp1 <- rf.fit$variable.importance|> as.numeric()
+ 
+ x <- model.matrix(`lactose content` ~. , 
+                   data =  medoidtrain |> 
+                     select(-sample))
+
+ rf.fit <- ranger(y =  medoidtrain$`lactose content`, x = x,  importance = "impurity") 
+ 
+ rfimp <- rf.fit$variable.importance|> as.numeric()
+cors <- as_tibble(cbind(wave = names(medoidtrain |> 
+                                       select(`412.71`: `3907.24`)) |>
+                          as.numeric(), 
+                        corsmed = corsmed, 
+                        corsSpec = corsSpec,
+                        rf = rfimp[-1]/max(rfimp[-1]),
+                        rfSpec = rfimp1[2:1814]/max(rfimp1[2:1814])))
+cors |> 
+  pivot_longer(-wave) |> 
+  ggplot(aes(x = wave, y = abs(value), group = name, col = name)) + 
+  geom_line()
+```
+
+
+
+## Cross - validation set up:
+
+- Split the full training set into 50 random splits of sample size 40 (training) and 24 (validation).
+
+- Fit the models to the randomly selected training (sub)-sets and compare using RMSE of the validation sets.
+
+
+```{r echo = FALSE}
+N <- 50
+```
+
+```{r}
+  set.seed(1951)
+random_split <- replicate(N, sample(length(sample), 40))
+```
+
+
+```{r}
+
+RMSE <- matrix(0, N, 16)
+predictions <- matrix(0, 24, 16)
+
+########################################################
+for (i in 1:N){
+  print(i)
+  j <- 1
+dat.tr <- medoidtrain |> 
+  filter(sample %in% sample[random_split[,i]])
+dat.te <- medoidtrain |> 
+  filter(sample %in% sample[-random_split[,i]])
+dat.tr <- dat.tr |> select(-sample)
+dat.te <- dat.te |> select(-sample)
+########################################################
+  set.seed(1951)
+  x <- model.matrix(`lactose content` ~. , data = dat.tr)
+
+  y1 <- dat.tr$`lactose content`
+
+  grid <- 10^seq(-3, 3, length = 100)
+
+  lasso.fit <- glmnet(x,y1,alpha=1, lambda = grid) # for
+  cv.out <- cv.glmnet(x,y1,alpha=1)
+
+  lasso.fit <- glmnet(x,y1,alpha=1,
+                      lambda = cv.out$lambda.min)
+
+  lasso.pred <- predict(lasso.fit, newx = model.matrix(`lactose content` ~. , data = dat.te))
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, lasso.pred)
+  predictions[,j] <- lasso.pred
+  j <- j + 1
+ ######################################################## 
+  set.seed(1951)
+  lasso.fit <- glmnet(x,y1,alpha=0.5, lambda = grid) # for
+  cv.out <- cv.glmnet(x,y1,alpha=1)
+
+  lasso.fit <- glmnet(x,y1,alpha=0.5,
+                      lambda = cv.out$lambda.min)
+
+  lasso.pred <- predict(lasso.fit, newx = model.matrix(`lactose content` ~. , data = dat.te))
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, lasso.pred)
+  predictions[,j] <- lasso.pred
+  j <- j + 1
+ ######################################################## 
+  set.seed(1951)
+  pls.fit <- plsr(`lactose content` ~., data = dat.tr, scale= TRUE, validation = "CV")
+
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 3)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 4)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 5)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 6)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 7)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 8)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 9)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 10)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 11)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 12)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 13)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 14)
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  predictions[,j] <- pls.pred
+  j <- j+ 1
+  
+  #   pls.pred <- predict(pls.fit, dat.te, ncomp = 15)
+  # 
+  # RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, pls.pred)
+  # predictions[,j] <- pls.pred
+  # j <- j+ 1
+  
+    ########################################################
+set.seed(1951)
+  svm.fit <- svm(dat.tr$`lactose content`~.,dat.tr)
+
+  #Predict using SVM regression
+  svm.pred <- predict(svm.fit, dat.te)
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, svm.pred)
+  predictions[,j] <- svm.pred
+  j <- j+1
+  ########################################################
+set.seed(1951)
+  rf.fit <- ranger(y = dat.tr$`lactose content`, x = x,  importance = "impurity")
+
+  rf.pred <- predict(rf.fit , data = model.matrix(`lactose content` ~. , data = dat.te))
+
+  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, rf.pred$predictions)
+  predictions[,j] <- rf.pred$predictions
+  j <- j+1
+          ####################################################
+  # set.seed(1951)
+  #       ppr.fit <- ppr(x, dat.tr$`lactose content`, nterms = 2, max.terms = 5)
+  #       ppr.pred <- ppr.fit |> predict(model.matrix(`lactose content` ~. , data = dat.te))               
+  #        
+  #         RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, ppr.pred)
+  #       predictions[,j]<- ppr.pred
+  #       j <- j+1
+  #       # plot(dat.tv[,1], ppr.pred,  main = "RF")
+  #       # abline(0,1)
+        ####################################################
+        # brnn.fit <- brnn(as.matrix(dat.tr |> select(-`lactose content`)), dat.tr$`lactose content`)
+        # ###prediction
+        # brnn.pred <- brnn.fit |> predict(model.matrix(`lactose content` ~. , data = dat.te))                          #predict y hat
+        # 
+        #  RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, brnn.pred)
+        #   predictions[,j] <- brnn.pred
+        # j <- j+1
+        # plot(dat.tv[,1], brnn.pred,  main = "BRNN")
+        # abline(0,1)
+        
+        ####################################################
+        # set.seed(1951)
+        # gbm.fit <- gbm(`lactose content`~., data = dat.tr, distribution = "gaussian", cv.folds = 2, n.trees = 10)
+        # best.iter <- gbm.perf(gbm.fit, method = "cv")
+        # 
+        # gbm.pred <- gbm.fit |> predict(dat.te,  n.trees = best.iter)               
+        # RMSE[i,j] <- calcRMSE(dat.te$`lactose content`, gbm.pred)
+        # predictions[,j] <- gbm.pred
+        # j <- j+1
+        # plot(dat.tv[,1], gbm.pred,  main = "GBM")
+        # abline(0,1)
+        
+
+}
+
+```
+
+```{r}
+RMSE3 <- RMSE  |>
+  as.data.frame() |>
+  mutate(split = as.factor(1:N)) |>
+  pivot_longer(1:16)
+
+RMSE3 |> 
+  group_by(name) |> 
+  mutate(meanv = mean(value)) |> 
+  ggplot(aes(x= name, y = value, color = split, group = split)) +
+  geom_point()+ geom_line() +
+  geom_line(aes(x = name, y = meanv), col = 1) +
+  theme(legend.position = "none") +
+  ylab("RMSE")
+
+
+t3 <- RMSE3 |> 
+  group_by(name) |> 
+  summarise(meanv = mean(value), sdv=sd(value)) |> 
+  arrange(desc(meanv))
+
+preds <- as_tibble(predictions) |> mutate(truth = dat.te$`lactose content`)
+
+preds |> 
+  pivot_longer(-truth) |>
+  ggplot(aes(x = truth, y = value, col = name)) +
+  geom_point()
+```
+
