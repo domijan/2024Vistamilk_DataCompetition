@@ -280,6 +280,8 @@ set.seed(1951)
 ```
 
 ```{r}
+
+colnames(RMSE) <- c( "LASSO" ,  "EN" ,"PLS3",         "PLS4" ,   "PLS5",         "PLS6" , "PLS7",         "PLS8" , "PLS9",         "PLS10" , "PLS11",         "PLS12" , "PLS13",         "PLS14" ,"SVM",  "RF")
 RMSE3 <- RMSE  |>
   as.data.frame() |>
   mutate(split = as.factor(1:N)) |>
@@ -288,7 +290,7 @@ RMSE3 <- RMSE  |>
 RMSE3 |> 
   group_by(name) |> 
   mutate(meanv = mean(value)) |> 
-  ggplot(aes(x= name, y = value, color = split, group = split)) +
+  ggplot(aes(x=  reorder(name, meanv), y = value, color = split, group = split)) +
   geom_point()+ geom_line() +
   geom_line(aes(x = name, y = meanv), col = 1) +
   theme(legend.position = "none") +
