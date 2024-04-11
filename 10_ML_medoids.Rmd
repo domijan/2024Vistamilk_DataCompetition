@@ -103,7 +103,7 @@ predictions <- matrix(0, 24, 16)
 
 ########################################################
 for (i in 1:N){
-  print(i)
+  # print(i)
   j <- 1
 dat.tr <- medoidtrain |> 
   filter(sample %in% sample[random_split[,i]])
@@ -304,9 +304,11 @@ t3 <- RMSE3 |>
 
 preds <- as_tibble(predictions) |> mutate(truth = dat.te$`lactose content`)
 
-preds |> 
-  pivot_longer(-truth) |>
-  ggplot(aes(x = truth, y = value, col = name)) +
-  geom_point()
+
+plot(dat.te$`lactose content`, predictions[,16])
+# preds |>
+#   pivot_longer(-truth) |>
+#   ggplot(aes(x = truth, y = value, col = name)) +
+# geom_point()
 ```
 
