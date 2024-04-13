@@ -237,3 +237,12 @@ saveRDS(pred_table, "pred_tableclass.rds")
 plot(pred_table$mn,  pred_table$mn.pred)
 ```
 
+
+> t3
+# A tibble: 4 × 3
+  name  meanv   sdv
+  <chr> <dbl> <dbl>
+1 RF     8.63  2.66
+2 LASSO  7.92  2.94
+3 PLS    7.32  3.26
+4 LDA    5.16  1.26
