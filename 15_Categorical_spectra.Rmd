@@ -20,10 +20,7 @@ library(broom)
 library(pls)
 library(glmnet)
 library(ranger)
-library(e1071)
-library(brnn)
-library(gbm)
-library(gridExtra)
+
 
 calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
 
@@ -202,11 +199,11 @@ pred_lda <- pred_lda$class
 ```
 
 ```{r}
-colnames(RMSE) <- c( "LASSO" ,  "EN" ,"PLS3",         "PLS4" ,   "PLS5",         "PLS6" , "PLS7",         "PLS8" , "PLS9",         "PLS10" , "PLS11",         "PLS12" , "PLS13",         "PLS14" ,"SVM",  "RF")
+colnames(RMSE) <- c( "RF", "PLS", "LASSO" ,  "LDA")
 RMSE3 <- RMSE  |>
   as.data.frame() |>
   mutate(split = as.factor(1:10)) |>
-  pivot_longer(1:16)
+  pivot_longer(1:4)
 
 RMSE3 |> 
   group_by(name) |> 
@@ -223,6 +220,8 @@ t3 <- RMSE3 |>
   summarise(meanv = mean(value), sdv=sd(value)) |> 
   arrange(desc(meanv))
 
+t3
+
 preds <- as_tibble(predictions) 
 
 plot(truth = dat.te$`lactose content`, predictions[,17] )
@@ -232,9 +231,9 @@ preds |>
   ggplot(aes(x = V1, y = value, col = name)) +
   geom_point()
 
-saveRDS(RMSE, "RMSE.rds")
+saveRDS(RMSE, "RMSEclass.rds")
 
-saveRDS(pred_table, "pred_table.rds")
+saveRDS(pred_table, "pred_tableclass.rds")
 plot(pred_table$mn,  pred_table$mn.pred)
 ```
 
