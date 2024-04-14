@@ -91,7 +91,7 @@ dat.te <- dat.te |> rename(Diet = `lactose content`)
 set.seed(1951)
 
 
-# ===================================
+
 fit_lda <- MASS::lda(Diet ~ ., 
                dat.tr)
 pred_lda <- fit_lda |> 
@@ -112,6 +112,7 @@ pred_lda <- pred_lda$class
   predictions[,j] <- pred_table$mn.pred
   j <- j+1
 
+ # ===================================
   
   lda_tr <- as_tibble(as.matrix(dat.tr %>% select(-Diet)) %*% fit_lda$scaling)
 lda_tr<- lda_tr %>% mutate(Diet = dat.tr$Diet)
@@ -162,11 +163,11 @@ rf.pred <- fit_rf |>
 ```
 
 ```{r}
-colnames(RMSE) <- c( "RF", "PLS", "LASSO" ,  "LDA")
+colnames(RMSE) <- c( "LDA", "RF")
 RMSE3 <- RMSE  |>
   as.data.frame() |>
   mutate(split = as.factor(1:10)) |>
-  pivot_longer(1:4)
+  pivot_longer(1:2)
 
 RMSE3 |> 
   group_by(name) |> 
@@ -194,18 +195,16 @@ preds |>
   ggplot(aes(x = V1, y = value, col = name)) +
   geom_point()
 
-saveRDS(RMSE, "RMSEclass.rds")
+saveRDS(RMSE, "RMSEclass3.rds")
 
-saveRDS(pred_table, "pred_tableclass.rds")
+saveRDS(pred_table, "pred_tableclass3.rds")
 plot(pred_table$mn,  pred_table$mn.pred)
 ```
 
 
 > t3
-# A tibble: 4 × 3
+# A tibble: 2 × 3
   name  meanv   sdv
   <chr> <dbl> <dbl>
-1 RF     8.63  2.66
-2 LASSO  7.92  2.94
-3 PLS    7.32  3.26
-4 LDA    5.16  1.26
+1 RF     5.29  1.35
+2 LDA    5.16  1.26
