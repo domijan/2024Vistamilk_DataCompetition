@@ -1,0 +1,121 @@
+---
+title: "ML attempts"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(ranger)
+
+calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+
+
+specTrain <- readRDS("specTrain.rds")
+specTest <- readRDS("specTest.rds")
+# specTest |> glimpse()
+
+
+
+sample <- specTrain$`sample number` |> unique()
+
+sample_te <- specTest$`sample number` |> unique()
+
+specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose content` )) 
+
+specTest<- specTest |> select(c(`412.71`: `3907.24`,`sample number`))
+
+set.seed(1951)
+
+
+```
+
+
+
+```{r}
+
+
+dat.tr <- specTrain 
+dat.te <- specTest
+
+tr.samp <- dat.tr |> select(`sample number`)
+dat.tr <- dat.tr |> select(-`sample number`)
+
+te.samp <- dat.te |> select(`sample number`)
+dat.te <- dat.te |> select(-`sample number`)
+
+
+truth <- dat.tr |> 
+  mutate(samp = tr.samp$`sample number`) |> 
+  group_by(samp) |> 
+  summarise(mn = mean(`lactose content`))
+
+
+  x <- model.matrix(`lactose content` ~. , data = dat.tr)
+  xte <- model.matrix( ~. , data = dat.te)
+    
+  y1 <- dat.tr$`lactose content`
+
+  rf.fit <- ranger(y = y1, x = x,  importance = "impurity")
+
+  
+  rf.pred.tr <- rf.fit |>   predict(data = x)
+
+  rf.pred <- rf.fit |> predict(data = xte)
+
+   pred_table <- tibble(pred =
+                         as.numeric(rf.pred.tr$predictions)) |> 
+    mutate(samp = tr.samp$`sample number`) |> 
+    group_by(samp) |> 
+    summarise(mn.pred = mean(pred), med.pred = median(pred)) |> 
+    left_join(truth)
+   
+table(round(pred_table$med.pred), pred_table$mn)
+   
+calcRMSE( pred_table$mn,  pred_table$mn.pred)
+calcRMSE( pred_table$mn,  pred_table$med.pred)
+plot( pred_table$mn,  pred_table$mn.pred)
+abline(a = 0, b = 1)
+   
+points( pred_table$mn,  pred_table$med.pred, col = 2)
+
+  
+ 
+
+  rf.pred <- rf.fit |> predict(data = xte)
+
+
+ pred_table <- tibble(pred =
+                         as.numeric(rf.pred.tr$predictions)) |> 
+    mutate(samp = tr.samp$`sample number`) |> 
+    group_by(samp) |> 
+    summarise(mn.pred = mean(pred), med.pred = median(pred)) |> 
+    left_join(truth)
+   
+
+ pred_table_te <- tibble(pred =
+                        as.numeric(rf.pred$predictions)) |> 
+    mutate(samp = te.samp$`sample number`) |> 
+    group_by(samp) |> 
+    summarise(mn.pred = mean(pred), med.pred = median(pred), sd.pred = sd(pred)) 
+ 
+
+
+pred_table_te |> ggplot(aes(med.pred, mn.pred)) + geom_point()
+ 
+tibble(pred =
+                        as.numeric(rf.pred$predictions)) |> 
+    mutate(samp = te.samp$`sample number`) |> ggplot(aes(samp, pred)) + geom_boxplot()
+  
+write.csv(pred_table_te, "KD_prediction2.csv")
+```

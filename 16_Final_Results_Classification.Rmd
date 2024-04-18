@@ -1,0 +1,179 @@
+---
+title: "ML attempts"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(broom)
+library(pls)
+library(glmnet)
+library(ranger)
+
+
+calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+
+
+specTrain <- readRDS("specTrain.rds")
+specTest <- readRDS("specTest.rds")
+# specTest |> glimpse()
+
+
+sample <- specTrain$`sample number` |> unique()
+
+sample_te <- specTest$`sample number` |> unique()
+
+specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose content` )) 
+
+specTest<- specTest |> select(c(`412.71`: `3907.24`,`sample number`))
+
+set.seed(1951)
+
+```
+
+
+
+
+
+```{r}
+
+dat.tr <- specTrain 
+dat.te <- specTest
+
+tr.samp <- dat.tr |> select(`sample number`)
+dat.tr <- dat.tr |> select(-`sample number`)
+
+te.samp <- dat.te |> select(`sample number`)
+dat.te <- dat.te |> select(-`sample number`)
+
+truth <- dat.tr |> 
+  mutate(samp = tr.samp$`sample number`) |> 
+  group_by(samp) |> 
+  summarise(mn = mean(`lactose content`))
+
+dat.tr$`lactose content` <- as.factor(dat.tr$`lactose content`)
+
+
+dat.tr <- dat.tr |> rename(Diet = `lactose content`)
+
+
+#######################################################
+# ===================================
+fit_lda <- MASS::lda(Diet ~ ., 
+               dat.tr)
+pred_lda <- fit_lda |> 
+  predict(dat.tr |> select(-Diet))
+
+pred_lda <- pred_lda$class
+# table(dat.tr$Diet, pred_lda)
+
+ pred_table <- tibble(pred =
+                        as.numeric(as.character(pred_lda))) |> 
+    mutate(samp = tr.samp$`sample number`) |> 
+    group_by(samp) |> 
+    summarise(mn.pred = mean(pred), med.pred = median(pred)) |> 
+    left_join(truth)
+   
+calcRMSE( pred_table$mn,  pred_table$mn.pred)
+calcRMSE( pred_table$mn,  pred_table$med.pred)
+plot( pred_table$mn,  pred_table$mn.pred)
+abline(a = 0, b = 1)
+   
+points( pred_table$mn,  pred_table$med.pred, col = 2)
+
+
+
+
+
+
+pred_lda_te <- fit_lda |> 
+  predict(dat.te)
+pred_lda_te <- pred_lda_te$class
+
+
+ pred_table_te <- tibble(pred =
+                        as.numeric(as.character(pred_lda_te))) |> 
+    mutate(samp = te.samp) |> 
+    group_by(samp) |> 
+    summarise(mn.pred = mean(pred), sd.pred = sd(pred)) 
+ 
+tibble_test <- tibble(pred =
+                        as.numeric(as.character(pred_lda_te))) |> 
+    mutate(samp = te.samp$`sample number`)
+
+
+ pred_table_te <- tibble_test |> group_by(samp) |> 
+    summarise(mn.pred = mean(pred), sd.pred = sd(pred), med.pred = median(pred)) 
+
+pred_table_te |> ggplot(aes(med.pred, sd.pred)) + geom_point()
+
+
+```
+
+```{r}
+
+
+lda_tr <-  as_tibble(as.matrix(dat.tr %>% select(-Diet)) %*% fit_lda$scaling)
+lda_tr<- lda_tr %>% mutate(Diet = dat.tr$Diet)
+
+
+
+
+
+lda_te <- as_tibble(as.matrix(dat.te) %*% fit_lda$scaling)
+lda_te <- lda_te %>% mutate(samp = te.samp$`sample number`)
+lda_te <- lda_te |> left_join(pred_table_te)
+
+p4 <- lda_tr %>% 
+  ggplot(aes(x = LD1, y = LD2, col = Diet)) + 
+  geom_point(aes(alpha = 0.1)) +
+  ylim(c(-5, 8))
+
+p5 <- lda_te %>% 
+  ggplot(aes(x = LD1, y = LD2, col = as.factor(med.pred))) + 
+  geom_point(aes(alpha = 0.1)) +
+  ylim(c(-5, 8))
+
+p6 <- lda_tr %>% 
+  ggplot(aes(x = LD3, y = LD4, col = Diet)) + 
+  geom_point(aes(alpha = 0.1)) +
+  ylim(c(-5, 8))
+
+p7 <- lda_te %>% 
+  ggplot(aes(x = LD3, y = LD4, col = as.factor(med.pred))) + 
+  geom_point(aes(alpha = 0.1)) +
+  ylim(c(-5, 8))
+
+p8 <- lda_tr %>% 
+  ggplot(aes(x = LD5, y = LD6, col = Diet)) + 
+  geom_point(aes(alpha = 0.1)) +
+  ylim(c(-5, 8))
+
+p9 <- lda_te %>% 
+  ggplot(aes(x = LD5, y = LD6, col = as.factor(med.pred))) + 
+  geom_point(aes(alpha = 0.1)) +
+  ylim(c(-5, 8))
+
+library(gridExtra)
+grid.arrange(p4, p5,p6, p7, p8, p9, nrow = 3)
+```
+
+```{r}
+
+write.csv(pred_table_te, "KD_prediction.csv")
+
+```
+
+
+
