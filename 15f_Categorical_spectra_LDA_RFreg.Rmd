@@ -204,9 +204,11 @@ plot(pred_table$mn,  pred_table$mn.pred)
 ```
 
 
+
+
 > t3
 # A tibble: 2 × 3
   name  meanv   sdv
   <chr> <dbl> <dbl>
-1 RF     5.29  1.35
+1 RF     5.66  1.12
 2 LDA    5.16  1.26
