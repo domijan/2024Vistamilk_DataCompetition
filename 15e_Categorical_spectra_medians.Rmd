@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
 
 ```{r}
-library(BKPC)
+
 library(tidyverse)
 library(broom)
 library(pls)
@@ -87,33 +87,27 @@ dat.te$`lactose content` <- as.factor(dat.te$`lactose content`)
 dat.tr <- dat.tr |> rename(Diet = `lactose content`)
 dat.te <- dat.te |> rename(Diet = `lactose content`)
 
-
-
 ########################################################
 set.seed(1951)
   x <- model.matrix(Diet ~. , data = dat.tr)
   xte = model.matrix(Diet ~. , data = dat.te)
 
-  mr <- marginalRelevance(x[, -1], dat.tr$Diet)
-  th <- mr$score>0.2
-  th2 <- c(FALSE, th)
-    th3 <- c(th, FALSE)
-     th4 <- c(th, TRUE)
 fit_rf <- ranger::ranger(
   y = dat.tr$Diet,
-  x = x[,th2],
+  x = x,
+  data = dat.tr, 
   importance = "impurity"
 )
 
 rf.pred <- fit_rf |> 
-  predict(data = xte[,th2])
+  predict(data = xte)
 
 
  pred_table <- tibble(pred =
                         as.numeric(as.character(rf.pred$predictions))) |> 
     mutate(samp = te.samp) |> 
     group_by(samp) |> 
-    summarise(mn.pred = mean(pred)) |> 
+    summarise(mn.pred = median(pred)) |> 
     left_join(truth)
  
 
@@ -131,18 +125,18 @@ rf.pred <- fit_rf |>
   # ===================================
 
 fit_pls <- caret::plsda(
-  dat.tr[,th3], 
+  dat.tr |> select(-Diet), 
   dat.tr$Diet, 
   ncomp = 70)
 
   pred_pls <- fit_pls |> 
-  predict(dat.te[,th3])
+  predict(dat.te |> select(-Diet))
   
    pred_table <- tibble(pred =
                         as.numeric(as.character(pred_pls))) |> 
     mutate(samp = te.samp) |> 
     group_by(samp) |> 
-    summarise(mn.pred = mean(pred)) |> 
+    summarise(mn.pred = median(pred)) |> 
     left_join(truth)
    
    RMSE[i,j] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
@@ -153,19 +147,19 @@ fit_pls <- caret::plsda(
   # ===================================  
    
   
-cvfit <- cv.glmnet(x[,th], dat.tr$Diet, family = "multinomial", nfolds = 5)
+cvfit <- cv.glmnet(x, dat.tr$Diet, family = "multinomial", nfolds = 5)
 # 
 # fit_lasso <- glmnet(x, dat.tr$Diet, family = "multinomial", lambda = cvfit$lambda.min)
 
 pred_lasso <- cvfit |> 
-  predict(xte[,th], type = "class", s = "lambda.min")
+  predict(xte, type = "class", s = "lambda.min")
 
 
  pred_table <- tibble(pred =
                         as.numeric(as.character(pred_lasso))) |> 
     mutate(samp = te.samp) |> 
     group_by(samp) |> 
-    summarise(mn.pred = mean(pred)) |> 
+    summarise(mn.pred = median(pred)) |> 
     left_join(truth)
    
    RMSE[i,j] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
@@ -178,9 +172,9 @@ pred_lasso <- cvfit |>
 
 # ===================================
 fit_lda <- MASS::lda(Diet ~ ., 
-               dat.tr[,th4])
+               dat.tr)
 pred_lda <- fit_lda |> 
-  predict(dat.te[,th3])
+  predict(dat.te)
 
 pred_lda <- pred_lda$class
 
@@ -189,7 +183,7 @@ pred_lda <- pred_lda$class
                         as.numeric(as.character(pred_lda))) |> 
     mutate(samp = te.samp) |> 
     group_by(samp) |> 
-    summarise(mn.pred = mean(pred)) |> 
+    summarise(mn.pred = median(pred)) |> 
     left_join(truth)
    
    RMSE[i,j] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
@@ -237,18 +231,17 @@ preds |>
   ggplot(aes(x = V1, y = value, col = name)) +
   geom_point()
 
-saveRDS(RMSE, "RMSEclass4.rds")
+saveRDS(RMSE, "RMSE5class.rds")
 
-saveRDS(pred_table, "pred_tableclass4.rds")
+saveRDS(pred_table, "pred_tableclass5.rds")
 plot(pred_table$mn,  pred_table$mn.pred)
 ```
 
 
-> t3
-# A tibble: 4 × 3
-  name  meanv   sdv
-  <chr> <dbl> <dbl>
-1 RF     9.00  2.44
-2 LASSO  7.70  2.17
-3 PLS    6.80  3.23
-4 LDA    6.03  2.43
+<!-- # A tibble: 4 × 3 -->
+<!--   name  meanv   sdv -->
+<!--   <chr> <dbl> <dbl> -->
+<!-- 1 RF     9.11  3.58 -->
+<!-- 2 LASSO  8.79  3.86 -->
+<!-- 3 PLS    7.08  4.07 -->
+<!-- 4 LDA    5.43  1.76 -->
