@@ -39,7 +39,8 @@ specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose 
 specTest<- specTest |> select(c(`412.71`: `3907.24`,`sample number`))
 
 set.seed(1951)
-
+path3 <- "data/Reference test dataset.xlsx"
+labelsTest <- readxl::read_excel(path3, sheet = readxl::excel_sheets(path3))
 ```
 
 
@@ -47,7 +48,6 @@ set.seed(1951)
 
 
 ```{r}
-
 dat.tr <- specTrain 
 dat.te <- specTest
 
@@ -66,8 +66,10 @@ dat.tr$`lactose content` <- as.factor(dat.tr$`lactose content`)
 
 
 dat.tr <- dat.tr |> rename(Diet = `lactose content`)
+```
 
 
+```{r}
 #######################################################
 # ===================================
 fit_lda <- MASS::lda(Diet ~ ., 
@@ -89,7 +91,6 @@ calcRMSE( pred_table$mn,  pred_table$mn.pred)
 calcRMSE( pred_table$mn,  pred_table$med.pred)
 plot( pred_table$mn,  pred_table$mn.pred)
 abline(a = 0, b = 1)
-   
 points( pred_table$mn,  pred_table$med.pred, col = 2)
 
 
@@ -112,13 +113,17 @@ tibble_test <- tibble(pred =
                         as.numeric(as.character(pred_lda_te))) |> 
     mutate(samp = te.samp$`sample number`)
 
-
+tibble_test |>  ggplot(aes(x = samp, y = pred)) +geom_boxplot()
  pred_table_te <- tibble_test |> group_by(samp) |> 
-    summarise(mn.pred = mean(pred), sd.pred = sd(pred), med.pred = median(pred)) 
+    summarise(mn.pred = mean(pred), sd.pred = sd(pred), med.pred = median(pred)) |> 
+    left_join(labelsTest |> rename(samp = `sample number`))
+ 
+ table(tibble_test$pred, tibble_test |> left_join(labelsTest |> rename(samp = `sample number`)) |> pull(`lactose content`))
 
-pred_table_te |> ggplot(aes(med.pred, sd.pred)) + geom_point()
+pred_table_te |> ggplot(aes(`lactose content`, med.pred)) + geom_point()
 
-
+calcRMSE( pred_table_te$med.pred,  pred_table_te$`lactose content`)
+# [1] 17.00735
 ```
 
 ```{r}
@@ -135,13 +140,16 @@ lda_te <- as_tibble(as.matrix(dat.te) %*% fit_lda$scaling)
 lda_te <- lda_te %>% mutate(samp = te.samp$`sample number`)
 lda_te <- lda_te |> left_join(pred_table_te)
 
+# saveRDS(lda_tr, "lda_tr.rds")
+# saveRDS(lda_te, "lda_te.rds")
+
 p4 <- lda_tr %>% 
   ggplot(aes(x = LD1, y = LD2, col = Diet)) + 
   geom_point(aes(alpha = 0.1)) +
   ylim(c(-5, 8))
 
 p5 <- lda_te %>% 
-  ggplot(aes(x = LD1, y = LD2, col = as.factor(med.pred))) + 
+  ggplot(aes(x = LD1, y = LD2, col = as.factor(`lactose content`))) + 
   geom_point(aes(alpha = 0.1)) +
   ylim(c(-5, 8))
 
@@ -151,7 +159,7 @@ p6 <- lda_tr %>%
   ylim(c(-5, 8))
 
 p7 <- lda_te %>% 
-  ggplot(aes(x = LD3, y = LD4, col = as.factor(med.pred))) + 
+  ggplot(aes(x = LD3, y = LD4, col = as.factor(`lactose content`))) + 
   geom_point(aes(alpha = 0.1)) +
   ylim(c(-5, 8))
 
@@ -161,7 +169,7 @@ p8 <- lda_tr %>%
   ylim(c(-5, 8))
 
 p9 <- lda_te %>% 
-  ggplot(aes(x = LD5, y = LD6, col = as.factor(med.pred))) + 
+  ggplot(aes(x = LD5, y = LD6, col = as.factor(`lactose content`))) + 
   geom_point(aes(alpha = 0.1)) +
   ylim(c(-5, 8))
 

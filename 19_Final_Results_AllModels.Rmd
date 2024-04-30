@@ -1,0 +1,41 @@
+---
+title: "ML attempts"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(tidyverse)
+
+calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+
+predictions <- read.csv("KD_prediction_submitted.csv")
+
+calcRMSE(predictions$lactose.content,  predictions$LDA)
+calcRMSE(predictions$lactose.content,  predictions$RF)
+calcRMSE(predictions$lactose.content,  predictions$LDA_RF)
+
+predictions |> pivot_longer(PredictionsLDA:PredictionsLDA_RF, names_to = "model", values_to = "Prediction") |> ggplot(aes(x = lactose.content, y = Prediction, col = model)) + geom_point() +
+  geom_abline(slope = 1, intercept = 0)
+
+# plot(predictions$lactose.content,  predictions$PredictionsLDA, ylab = "Prediction", xlab = "Lactose Content")
+# abline(a = 0, b = 1)
+#    
+# points(predictions$lactose.content, predictions$PredictionsRF, col = 2)
+#    
+# points(predictions$lactose.content, predictions$PredictionsLDA_RF, col = 3)
+#   
+
+
+
+```

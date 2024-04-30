@@ -36,8 +36,7 @@ specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose 
 specTest<- specTest |> select(c(`412.71`: `3907.24`,`sample number`))
 
 set.seed(1951)
-path3 <- "data/Reference test dataset.xlsx"
-labelsTest <- readxl::read_excel(path3, sheet = readxl::excel_sheets(path3))
+
 
 ```
 
@@ -60,20 +59,31 @@ truth <- dat.tr |>
   summarise(mn = mean(`lactose content`))
 
 
-  x <- model.matrix(`lactose content` ~. , data = dat.tr)
-  xte <- model.matrix( ~. , data = dat.te)
-    
-  y1 <- dat.tr$`lactose content`
 
-  rf.fit <- ranger(y = y1, x = x,  importance = "impurity")
+  y1 <- dat.tr$`lactose content`
+  dat.tr$`lactose content` <- as.factor(dat.tr$`lactose content`)
+  dat.tr <- dat.tr |> rename(Diet = `lactose content`)
+```
+
+
+```{r}
+
+# ===================================
+fit_lda <- MASS::lda(Diet ~ ., 
+               dat.tr)
+lda_tr <- as_tibble(as.matrix(dat.tr |> select(-Diet)) %*% fit_lda$scaling)
+
+
+lda_te <- as_tibble(as.matrix(dat.te) %*% fit_lda$scaling)
+
+    
+
+rf.fit <- ranger(y = y1, x = lda_tr,  importance = "impurity")
 
   
-vi <- rf.fit$variable.importance |> sort(decreasing = TRUE) 
-write.csv(vi, "vi.csv")
+  rf.pred.tr <- rf.fit |>   predict(data = lda_tr)
 
-  rf.pred.tr <- rf.fit |>   predict(data = x)
-
-  rf.pred <- rf.fit |> predict(data = xte)
+  rf.pred <- rf.fit |> predict(data = lda_te)
 
    pred_table <- tibble(pred =
                          as.numeric(rf.pred.tr$predictions)) |> 
@@ -81,11 +91,6 @@ write.csv(vi, "vi.csv")
     group_by(samp) |> 
     summarise(mn.pred = mean(pred), med.pred = median(pred)) |> 
     left_join(truth)
-   
-  RF_pred <-  tibble(pred = as.numeric(rf.pred.tr$predictions)) |> 
-    mutate(samp = tr.samp$`sample number`)
-  
-    RF_pred |> ggplot(aes(x = samp, y = pred)) +geom_boxplot()
    
 table(round(pred_table$med.pred), pred_table$mn)
    
@@ -95,43 +100,21 @@ plot( pred_table$mn,  pred_table$mn.pred)
 abline(a = 0, b = 1)
    
 points( pred_table$mn,  pred_table$med.pred, col = 2)
-```
 
+  
 
-```{r}
-rf.pred <- rf.fit |> predict(data = xte)
-
-
- pred_table <- tibble(pred =
-                         as.numeric(rf.pred.tr$predictions)) |> 
-    mutate(samp = tr.samp$`sample number`) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = mean(pred), med.pred = median(pred)) |> 
-    left_join(truth)
-   
- tibble(pred =
-                        as.numeric(rf.pred$predictions)) |> 
-    mutate(samp = te.samp$`sample number`) |> ggplot(aes(x = samp, y = pred)) +geom_boxplot()
-
- pred_table_te <- tibble(pred =
+pred_table_te <- tibble(pred =
                         as.numeric(rf.pred$predictions)) |> 
     mutate(samp = te.samp$`sample number`) |> 
     group_by(samp) |> 
-    summarise(mn.pred = mean(pred), med.pred = median(pred), sd.pred = sd(pred)) |> 
-    left_join(labelsTest |> rename(samp = `sample number`))
+    summarise(mn.pred = mean(pred), med.pred = median(pred), sd.pred = sd(pred)) 
  
 
 
-pred_table_te |> ggplot(aes(med.pred, `lactose content`)) + geom_point()
-calcRMSE( pred_table_te$med.pred,  pred_table_te$`lactose content`)
-# [1] 13.22541
-```
-
-
-```{r}
-tibble(pred =
-                        as.numeric(rf.pred$predictions)) |> 
+pred_table_te |> ggplot(aes(med.pred, mn.pred)) + geom_point()
+ 
+tibble(pred = as.numeric(rf.pred$predictions)) |> 
     mutate(samp = te.samp$`sample number`) |> ggplot(aes(samp, pred)) + geom_boxplot()
   
-write.csv(pred_table_te, "KD_prediction2.csv")
+write.csv(pred_table_te, "KD_prediction3.csv")
 ```

@@ -376,7 +376,7 @@ set.seed(1951)
 ```
 
 ```{r}
-colnames(RMSE) <- c( "LASSO" ,  "EN" ,"PLS3",         "PLS4" ,   "PLS5",         "PLS6" , "PLS7",         "PLS8" , "PLS9",         "PLS10" , "PLS11",         "PLS12" , "PLS13",         "PLS14" ,"SVM",  "RF")
+colnames(RMSE) <- c( "LASSO" ,  "EN" ,"PLS15",         "PLS16" ,   "PLS17",         "PLS6" , "PLS7",         "PLS8" , "PLS9",         "PLS10" , "PLS11",         "PLS12" , "PLS13",         "PLS14" ,"SVM",  "RF")
 RMSE3 <- RMSE  |>
   as.data.frame() |>
   mutate(split = as.factor(1:10)) |>
