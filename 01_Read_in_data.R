@@ -4,7 +4,9 @@ library(here)
 
 path <- "data/train_dataset.xlsx"
 path2 <- "data/reference values.xlsx"
+path3 <- "data/Reference test dataset.xlsx"
 sheets <- excel_sheets(path)
+labelsTest <- readxl::read_excel(path3, sheet = excel_sheets(path3))
 
 specTrain <- NULL
 for(i in 1:length(sheets)){
