@@ -1,0 +1,641 @@
+---
+title: 'International workshop on Spectroscopy & Chemometrics: Data Competition'
+author: "Katarina Domijan"
+date: "April 30, 2024"
+output:
+  beamer_presentation: default
+  ioslides_presentation: default
+  slidy_presentation: default
+editor_options:
+  chunk_output_type: console
+---
+
+## Data: medoids for each sample
+<!-- ## Data: spectra for all pixels, lactose content $\leq 48$ -->
+
+```{r echo = FALSE, message=FALSE, warning=FALSE, results = 'hide'}
+
+library(tidyverse)
+
+calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+
+
+specTrain <- readRDS("specTrain.rds")
+medoiddat <- readRDS("medoiddat.rds")
+medoidtest <- readRDS("medoidtest.rds")
+path3 <- "data/Reference test dataset.xlsx"
+labelsTest <- readxl::read_excel(path3, sheet = readxl::excel_sheets(path3))
+
+labels <-specTrain |> select(c(`lactose content`, `sample number`))
+
+tbl <- sort(unique(labels$`lactose content`))
+```
+
+<!-- ```{r echo = FALSE, message=FALSE, warning=FALSE} -->
+<!-- a <- specTrain |> -->
+<!--   group_by(`sample number`) |> -->
+<!--   summarise(across(everything(), -->
+<!--                    list(min = ~ quantile(.x, probs = 0.1), -->
+<!--                         max = ~ quantile(.x, probs = 0.9)))) |> -->
+<!--   pivot_longer(-c(`sample number`)) -->
+
+<!-- a <- a |> -->
+<!--   mutate(wave  = str_split(name, "_", simplify = TRUE)[,1], -->
+<!--          name  = str_split(name, "_", simplify = TRUE)[,2]) -->
+
+
+<!-- a <-  a |> -->
+<!--   pivot_wider(names_from = name, values_from = value) -->
+
+<!-- a <-  a |> mutate(wave = as.numeric(wave)) -->
+
+<!-- a <-  a |> left_join(labels) -->
+
+<!-- ``` -->
+
+
+
+<!-- ```{r, fig.height=2, fig.width=12, echo = FALSE, message=FALSE, warning=FALSE} -->
+<!-- for (i in 1:4){ -->
+<!-- p1 <-  a |> -->
+<!--   filter(`lactose content`==tbl[i]) |> -->
+<!--   ggplot(aes(x = wave, col = `sample number`)) + -->
+<!--   geom_ribbon(aes(ymin=min, ymax=max, fill = `sample number`), alpha = 0.7) + -->
+<!--   facet_wrap(~`sample number`, nrow = 1) + -->
+<!--   ggtitle(tbl[i]) + -->
+<!--   theme(legend.position = "none") -->
+<!--   # ylim(c(-25, 175)) -->
+<!-- print(p1) -->
+<!-- } -->
+<!-- ``` -->
+
+
+<!-- ## Data: spectra for all pixels, lactose content $> 48$ -->
+
+
+
+<!-- ```{r, fig.height=2, fig.width=12, echo = FALSE, message=FALSE, warning=FALSE} -->
+<!-- for (i in 5:8){ -->
+<!-- p1 <-  a |> -->
+<!--   filter(`lactose content`==tbl[i]) |> -->
+<!--   ggplot(aes(x = wave, col = `sample number`)) + -->
+<!--   geom_ribbon(aes(ymin=min, ymax=max, fill = `sample number`), alpha = 0.7) + -->
+<!--   facet_wrap(~`sample number`, nrow = 1) + -->
+<!--   ggtitle(tbl[i]) + -->
+<!--   theme(legend.position = "none") -->
+<!--   # ylim(c(-25, 175)) -->
+<!-- print(p1) -->
+<!-- } -->
+<!-- ``` -->
+
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+
+medoiddat|>
+  pivot_longer(-c(`lactose content`, sample)) |>
+  mutate(name = as.numeric(name)) |>
+  ggplot(aes(x = name, y = value, group = sample, col = as.factor(`lactose content`))) +
+  geom_line() +
+  facet_wrap(~as.factor(`lactose content`)) + 
+  theme(legend.position = "none")
+
+```
+
+
+
+## Data: medoids for each sample PCA (col = lactose content)
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+pc <- medoiddat |> select(`412.71`: `3907.24`) |>
+  prcomp(center = TRUE,
+            scale. = TRUE)
+library(broom)
+library(gridExtra)
+p1 <- pc |>
+  augment(medoiddat) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`))) +
+  geom_point()+ 
+  theme(legend.position = "none")
+
+p2 <- pc |>
+  augment(medoiddat) |>
+  ggplot(aes(.fittedPC1, .fittedPC3, color =(`lactose content`))) +
+  geom_point()+ 
+  theme(legend.position = "none")
+
+grid.arrange(p1, p2, nrow = 1)
+# library(scatterplot3d)
+# pcdat <- pc|> 
+#   augment(medoiddat)
+# scatterplot3d(pcdat$.fittedPC1, pcdat$.fittedPC2,  pcdat$.fittedPC3, color = pcdat$`lactose content`)
+
+# library(plotly)
+# plot_ly(pc|> 
+#   augment(medoiddat), x = ~.fittedPC1, y = ~.fittedPC2, z = ~.fittedPC3, color = ~ `lactose content`)
+
+```
+
+## Models
+
+- Attempted as classification and regression problem. 
+  
+- Classification models: random forests, partial least squares, lasso and linear discriminant analysis.
+  
+- Regression models: random forests, support vector machines for regression (Gaussian kernel),  partial least squares, lasso and elastic net.
+
+
+## Cross-validation set up:
+
+- I used wavelengths 412.71 - 3907.24.
+
+- Split the full training set of 64 milk samples into 10 random splits of sample size 40 (training) and 24 (validation).
+
+- Fit the models to the randomly selected training (sub)-sets and compare using RMSE of the validation sets.
+ 
+- I considered using medoids for from each sample to build models, but better results were obtained when using all pixels from a sample.
+
+- Sample information is not accounted for in the model training, all pixels are modeled as independent observations.
+
+- Predictions were obtained for each pixel in the validation set and the prediction for each sample is obtained by taking the median prediction for the pixels in the sample.
+
+
+ 
+
+
+## RMSE: regression
+
+```{r  echo = FALSE, message=FALSE, warning=FALSE}
+RMSE <- readRDS("RMSEreg2.rds")
+colnames(RMSE) <- c( "LASSO" ,  "EN" ,"PLS15",         "PLS16" ,   "PLS17",         "PLS6" , "PLS7",         "PLS8" , "PLS9",         "PLS10" , "PLS11",         "PLS12" , "PLS13",         "PLS" ,"SVM",  "RF")
+RMSE3 <- RMSE  |>
+  as.data.frame() |>
+  select(c( "LASSO" ,  "EN" ,  "PLS" ,"SVM",  "RF")) |>
+  mutate(split = as.factor(1:10)) |>
+  pivot_longer(1:5)
+
+RMSE3 |> 
+  group_by(name) |> 
+  mutate(meanv = mean(value)) |> 
+  ggplot(aes(x= reorder(name, meanv), y = value, color = split, group = split)) +
+  geom_point()+ geom_line() +
+  geom_line(aes(x = name, y = meanv), col = 1) +
+  theme(legend.position = "none") +
+  ylab("RMSE") +
+  ylim(c(0, 35)) +
+  xlab("")
+
+```
+
+
+## RMSE: classification
+
+```{r  echo = FALSE, message=FALSE, warning=FALSE}
+RMSE <- readRDS("RMSE5class.rds")
+RMSE3 <- RMSE  |>
+  as.data.frame() |>
+  mutate(split = as.factor(1:10)) |>
+  pivot_longer(1:4)
+
+RMSE3 |> 
+  group_by(name) |> 
+  mutate(meanv = mean(value)) |> 
+  ggplot(aes(x= reorder(name, meanv), y = value, color = split, group = split)) +
+  geom_point()+ geom_line() +
+  geom_line(aes(x = name, y = meanv), col = 1) +
+  theme(legend.position = "none") +
+  ylab("RMSE") +
+  ylim(c(0, 35)) +
+  xlab("")
+
+```
+
+
+## LDA subspace: Training and testing data (predicted labels)
+
+
+```{r  echo = FALSE, message=FALSE, warning=FALSE}
+lda_tr <- readRDS("lda_tr.rds")
+lda_te <- readRDS("lda_te.rds")
+```
+
+
+```{r  echo = FALSE, message=FALSE, warning=FALSE}
+
+
+library(RColorBrewer)
+
+#define custom color scale
+myColors <- brewer.pal(8, "Spectral")
+names(myColors) <- levels(lda_tr$Diet)
+custom_colors <- scale_colour_manual(name = "Species Names", values = myColors)
+
+p4 <- lda_tr %>% 
+  ggplot(aes(x = LD1, y = LD2, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-10, 30)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p5 <- lda_te %>% 
+  ggplot(aes(x = LD1, y = LD2, col = as.factor(med.pred))) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-10, 30)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p6 <- lda_tr %>% 
+  ggplot(aes(x = LD3, y = LD4, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-15, 10)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p7 <- lda_te %>% 
+  ggplot(aes(x = LD3, y = LD4, col = as.factor(med.pred))) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-15, 10)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p8 <- lda_tr %>% 
+  ggplot(aes(x = LD5, y = LD6, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+    xlim(c(-10, 6)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p9 <- lda_te %>% 
+  ggplot(aes(x = LD5, y = LD6, col = as.factor(med.pred))) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+    xlim(c(-10, 6)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+library(gridExtra)
+grid.arrange(p4, p5,p6, p7, p8, p9, nrow = 3)
+
+```
+
+
+
+<!-- ## LDA subspace: Training and testing data (actual labels) -->
+
+
+
+
+<!-- ```{r  echo = FALSE, message=FALSE, warning=FALSE} -->
+
+<!-- predictions <- read.csv("KD_prediction_submitted.csv") -->
+
+<!-- lda_te <- lda_te |> left_join(predictions |> rename(samp = sample)) -->
+<!-- p4 <- lda_tr %>%  -->
+<!--   ggplot(aes(x = LD1, y = LD2, col = as.numeric(as.character(Diet)))) +  -->
+<!--   geom_point(alpha = 0.1) + -->
+<!--   ylim(c(-10, 10)) + -->
+<!--   xlim(c(-10, 30)) + -->
+<!--   theme(legend.position = "none") -->
+
+<!-- p5 <- lda_te %>%  -->
+<!--   ggplot(aes(x = LD1, y = LD2, col = lactose.content)) +  -->
+<!--   geom_point(alpha = 0.1) + -->
+<!--   ylim(c(-10, 10)) + -->
+<!--   xlim(c(-10, 30)) + -->
+<!--   theme(legend.position = "none") -->
+
+<!-- p6 <- lda_tr %>%  -->
+<!--   ggplot(aes(x = LD3, y = LD4, col = as.numeric(as.character(Diet)))) +  -->
+<!--   geom_point(alpha = 0.1) + -->
+<!--   ylim(c(-10, 10)) + -->
+<!--   xlim(c(-15, 10)) + -->
+<!--   theme(legend.position = "none") -->
+
+<!-- p7 <- lda_te %>%  -->
+<!--   ggplot(aes(x = LD3, y = LD4, col = lactose.content)) +  -->
+<!--   geom_point(alpha = 0.1) + -->
+<!--   ylim(c(-10, 10)) + -->
+<!--   xlim(c(-15, 10)) + -->
+<!--   theme(legend.position = "none") -->
+
+<!-- p8 <- lda_tr %>%  -->
+<!--   ggplot(aes(x = LD5, y = LD6, col = as.numeric(as.character(Diet)))) +  -->
+<!--   geom_point(alpha = 0.1) + -->
+<!--   ylim(c(-10, 10)) + -->
+<!--     xlim(c(-10, 6)) + -->
+<!--   theme(legend.position = "none") -->
+
+<!-- p9 <- lda_te %>%  -->
+<!--   ggplot(aes(x = LD5, y = LD6, col = lactose.content)) +  -->
+<!--   geom_point(alpha = 0.1) + -->
+<!--   ylim(c(-10, 10)) + -->
+<!--     xlim(c(-10, 6)) + -->
+<!--   theme(legend.position = "none") -->
+
+
+<!-- grid.arrange(p4, p5,p6, p7, p8, p9, nrow = 3) -->
+
+<!-- ``` -->
+
+
+## Results
+
+```{r echo = FALSE}
+predictions <- read.csv("KD_prediction_submitted.csv")
+
+predictions |> pivot_longer(PredictionsLDA:PredictionsLDA_RF, names_to = "model", values_to = "Prediction") |> ggplot(aes(x = lactose.content, y = Prediction, col = model)) + geom_point() +
+  geom_abline(slope = 1, intercept = 0)
+
+```
+
+- Lowest RMSE LDA-RF (11.92), RF (13.22)  and then LDA (17)
+
+
+<!-- ## Results -->
+
+<!-- ```{r} -->
+<!-- calcRMSE(predictions$lactose.content,  predictions$PredictionsLDA) -->
+<!-- calcRMSE(predictions$lactose.content,  predictions$PredictionsRF) -->
+<!-- calcRMSE(predictions$lactose.content,  predictions$PredictionsLDA_RF) -->
+<!-- ``` -->
+
+
+## Test set data: medoids for each sample
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+medoidtest <- medoidtest |> select(`412.71`: `3907.24`) |> mutate(`lactose content` =  labelsTest$`lactose content`)
+
+medoidtest|>
+  mutate(`sample number` =  labelsTest$`sample number`) |>
+  pivot_longer(-c(`lactose content`, `sample number`)) |>
+  mutate(name = as.numeric(name)) |>
+  ggplot(aes(x = name, y = value, group =  `sample number`, col = as.factor(`lactose content`))) +
+  geom_line() +
+  facet_wrap(~as.factor(`lactose content`)) + 
+  theme(legend.position = "none")
+
+```
+ - poor predictions for samples with lactose content 24 and 60 (sample 42 and 50).
+
+## LDA subspace
+
+
+```{r  echo = FALSE, message=FALSE, warning=FALSE}
+
+lda_te <- lda_te |> left_join(predictions |> rename(samp = sample))
+
+lda_te2 <- lda_te %>% 
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60))
+
+
+
+
+
+
+
+
+
+p4 <- lda_tr %>% 
+  ggplot(aes(x = LD1, y = LD2, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-10, 30)) +
+  theme(legend.position = "none")+ 
+  custom_colors +
+  ggtitle("Training set")
+
+p5 <- lda_te2 |>
+  ggplot(aes(x = LD1, y = LD2, col = as.factor(PredictionsLDA))) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-10, 30)) +
+  theme(legend.position = "none")+ 
+  custom_colors+
+  ggtitle("Testing set prediction")
+
+p5b <- lda_te2 |>
+  ggplot(aes(x = LD1, y = LD2, col = lactose.content)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-10, 30)) +
+  theme(legend.position = "none")+ 
+  custom_colors+
+  ggtitle("Testing set labels")
+
+p6 <- lda_tr %>% 
+  ggplot(aes(x = LD3, y = LD4, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-15, 10)) +
+  theme(legend.position = "none")+ 
+  custom_colors+
+  ggtitle("Training set")
+
+
+p7 <- lda_te %>% 
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60)) |>
+  ggplot(aes(x = LD3, y = LD4, col = as.factor(PredictionsLDA))) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-15, 10)) +
+  theme(legend.position = "none")+ 
+  custom_colors+
+  ggtitle("Testing set prediction")
+
+p7b <- lda_te %>% 
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60)) |>
+  ggplot(aes(x = LD3, y = LD4, col = lactose.content)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-15, 10)) +
+  theme(legend.position = "none")+ 
+  custom_colors+
+  ggtitle("Testing set labels")
+
+p8 <- lda_tr %>% 
+  ggplot(aes(x = LD5, y = LD6, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+    xlim(c(-10, 6)) +
+  theme(legend.position = "none")+ 
+  custom_colors+
+  ggtitle("Training set")
+
+p9 <- lda_te %>% 
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60)) |>
+  ggplot(aes(x = LD5, y = LD6, col = as.factor(PredictionsLDA))) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+    xlim(c(-10, 6)) +
+  theme(legend.position = "none")+ 
+  custom_colors+
+  ggtitle("Testing set prediction")
+
+p9b <- lda_te %>% 
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60)) |>
+  ggplot(aes(x = LD5, y = LD6, col = lactose.content)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+    xlim(c(-10, 6)) +
+  theme(legend.position = "none")+ 
+  custom_colors+
+  ggtitle("Testing set labels")
+
+grid.arrange(p4, p5, p5b,p6, p7,p7b,  p8, p9, p9b, nrow = 3)
+
+```
+
+
+
+
+## RF variable importance subspace: Training and testing data
+
+
+```{r  echo = FALSE, message=FALSE, warning=FALSE}
+vi <- read.csv("vi.csv")
+vi <- vi$X[1:6]
+vi <- gsub('`', '', vi)
+specTest <- readRDS("specTest.rds")
+```
+
+
+```{r  echo = FALSE, message=FALSE, warning=FALSE}
+
+
+
+p4 <- specTrain[,vi] %>% 
+  mutate(Diet  = as.factor(labels$`lactose content`)) |>
+    filter(Diet %in% c(24,60)) |>
+  ggplot(aes(x = `2468.54`, y = `2472.4`, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+  ylim(c(0, 60)) +
+  xlim(c(0, 60)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p5 <-  specTest[,vi] %>% 
+  mutate(Diet  = as.factor(lda_te$lactose.content))|>
+  filter(Diet %in% c(24,60)) |>
+  ggplot(aes(x = `2468.54`, y = `2472.4`, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+    ylim(c(0, 60)) +
+  xlim(c(0, 60)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p6 <- specTrain[,vi] %>% 
+  mutate(Diet  = as.factor(labels$`lactose content`)) |>
+    filter(Diet %in% c(24,60)) |>
+  ggplot(aes(x = `2460.83`, y = `2487.83`, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+    ylim(c(0, 60)) +
+  xlim(c(0, 60)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p7 <- specTest[,vi] %>% 
+  mutate(Diet  = as.factor(lda_te$lactose.content)) |>
+  filter(Diet %in% c(24,60)) |>
+  ggplot(aes(x = `2460.83`, y = `2487.83`, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+    ylim(c(0, 60)) +
+  xlim(c(0, 60)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p8 <- specTrain[,vi] %>% 
+  mutate(Diet  = as.factor(labels$`lactose content`)) |>
+    filter(Diet %in% c(24,60)) |>
+  ggplot(aes(x = `2433.83`, y = `2458.9`, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+    ylim(c(0, 60)) +
+  xlim(c(0, 60)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+p9 <- specTest[,vi] %>% 
+  mutate(Diet  = as.factor(lda_te$lactose.content)) |>
+  filter(Diet %in% c(24,60)) |>
+  ggplot(aes(x = `2433.83`, y = `2458.9`, col = Diet)) + 
+  geom_point(alpha = 0.1) +
+    ylim(c(0, 60)) +
+  xlim(c(0, 60)) +
+  theme(legend.position = "none")+
+  custom_colors
+
+
+grid.arrange(p4, p5,p6, p7, p8, p9, nrow = 3)
+
+```
+
+
+<!-- ## Test set medoids for each sample PCA (col = lactose content) -->
+
+<!-- ```{r echo = FALSE, message=FALSE, warning=FALSE} -->
+<!-- preds <- lda_te |> select(med.pred, samp) -->
+<!-- pdat <- pc |> -->
+<!--   predict(medoidtest) |>  -->
+<!--   as_tibble()|>  -->
+<!--   mutate(`lactose content` =  labelsTest$`lactose content`,  lc = `lactose content` %in% c(24,60))|> -->
+<!--   mutate(samp =  labelsTest$`sample number`) |>  -->
+<!--  left_join(preds) -->
+<!-- p1 <-  pdat |> -->
+<!--   ggplot(aes(PC1, PC2, color = med.pred,  shape =  lc)) + -->
+<!--   geom_point()+  -->
+<!--   theme(legend.position = "none") -->
+
+<!-- p2 <- pdat |> -->
+<!--   ggplot(aes(PC1, PC3, color =med.pred,  shape =  lc)) + -->
+<!--   geom_point()+  -->
+<!--   theme(legend.position = "none") -->
+
+<!-- grid.arrange(p1, p2, nrow = 1) -->
+
+<!-- ``` -->
+
+
+
+
+<!-- ## Test set medoids for each sample PCA (col = lactose content) -->
+
+<!-- ```{r echo = FALSE, message=FALSE, warning=FALSE} -->
+<!-- preds <- lda_te |> select(med.pred, samp) -->
+<!-- p1 <- pc |> -->
+<!--   predict(medoidtest) |>  -->
+<!--   as_tibble()|>  -->
+<!--   mutate(`lactose content` =  labelsTest$`lactose content`,  lc = `lactose content` %in% c(24,60))|> -->
+<!--   mutate(samp =  labelsTest$`sample number`) |>  -->
+<!--  left_join(preds) |> -->
+<!--   ggplot(aes(PC1, PC2, color = (`lactose content`),  shape =  lc)) + -->
+<!--   geom_point()+  -->
+<!--   theme(legend.position = "none") -->
+
+<!-- p2 <- pc |> -->
+<!--   predict(medoidtest) |>  -->
+<!--   as_tibble()|>  -->
+<!--   mutate(`lactose content` =  labelsTest$`lactose content`,  lc = `lactose content` %in% c(24,60)) |> -->
+<!--   ggplot(aes(PC1, PC3, color =(`lactose content`),  shape =  lc)) + -->
+<!--   geom_point()+  -->
+<!--   theme(legend.position = "none") -->
+
+<!-- grid.arrange(p1, p2, nrow = 1) -->
+
+<!-- ``` -->
+
+## Thank you
+
+- code at https://github.com/domijan/2024Vistamilk_DataCompetition
+
+
+
+
