@@ -343,7 +343,7 @@ grid.arrange(p4, p5,p6, p7, p8, p9, nrow = 3)
 <!-- ``` -->
 
 
-## Results: testing set lactose content received after submission
+## Results: testing set (after submission)
 
 ```{r echo = FALSE}
 predictions <- read.csv("KD_prediction_submitted.csv")
