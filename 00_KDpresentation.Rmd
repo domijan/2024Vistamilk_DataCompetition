@@ -88,7 +88,7 @@ tbl <- sort(unique(labels$`lactose content`))
 <!-- } -->
 <!-- ``` -->
 
-
+<!-- ## Data: medoids for each sample -->
 
 ```{r echo = FALSE, message=FALSE, warning=FALSE}
 
@@ -163,7 +163,7 @@ grid.arrange(p1, p2, nrow = 1)
  
 
 
-## RMSE: regression
+## RMSE: regression (validation set 24 samples)
 
 ```{r  echo = FALSE, message=FALSE, warning=FALSE}
 RMSE <- readRDS("RMSEreg2.rds")
@@ -188,7 +188,7 @@ RMSE3 |>
 ```
 
 
-## RMSE: classification
+## RMSE: classification (validation set 24 samples)
 
 ```{r  echo = FALSE, message=FALSE, warning=FALSE}
 RMSE <- readRDS("RMSE5class.rds")
@@ -211,7 +211,7 @@ RMSE3 |>
 ```
 
 
-## LDA subspace: Training and testing data (predicted labels)
+## LDA subspace: training and testing data (predicted labels)
 
 
 ```{r  echo = FALSE, message=FALSE, warning=FALSE}
@@ -343,7 +343,7 @@ grid.arrange(p4, p5,p6, p7, p8, p9, nrow = 3)
 <!-- ``` -->
 
 
-## Results
+## Results: testing set lactose content received after submission
 
 ```{r echo = FALSE}
 predictions <- read.csv("KD_prediction_submitted.csv")
@@ -365,7 +365,7 @@ predictions |> pivot_longer(PredictionsLDA:PredictionsLDA_RF, names_to = "model"
 <!-- ``` -->
 
 
-## Test set data: medoids for each sample
+## Testing set data: medoids for each sample
 
 ```{r echo = FALSE, message=FALSE, warning=FALSE}
 medoidtest <- medoidtest |> select(`412.71`: `3907.24`) |> mutate(`lactose content` =  labelsTest$`lactose content`)
@@ -382,7 +382,7 @@ medoidtest|>
 ```
  - poor predictions for samples with lactose content 24 and 60 (sample 42 and 50).
 
-## LDA subspace
+## LDA subspace (testing set samples with lactose content 24 and 60)
 
 
 ```{r  echo = FALSE, message=FALSE, warning=FALSE}
@@ -498,7 +498,7 @@ grid.arrange(p4, p5, p5b,p6, p7,p7b,  p8, p9, p9b, nrow = 3)
 
 
 
-## RF variable importance subspace: Training and testing data
+## RF variable importance subspace: training and testing data (samples with lactose content 24 and 60)
 
 
 ```{r  echo = FALSE, message=FALSE, warning=FALSE}
