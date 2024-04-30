@@ -197,9 +197,9 @@ preds |>
   ggplot(aes(x = V1, y = value, col = name)) +
   geom_point()
 
-saveRDS(RMSE, "RMSEclass3.rds")
+saveRDS(RMSE, "RMSEclassF.rds")
 
-saveRDS(pred_table, "pred_tableclass3.rds")
+saveRDS(pred_table, "pred_tableclassF.rds")
 plot(pred_table$mn,  pred_table$mn.pred)
 ```
 
