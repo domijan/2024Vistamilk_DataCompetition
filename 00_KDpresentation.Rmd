@@ -1,5 +1,5 @@
 ---
-title: 'International workshop on Spectroscopy & Chemometrics: Data Competition'
+title: 'International Workshop on Spectroscopy & Chemometrics: Data Competition'
 author: "Katarina Domijan"
 date: "April 30, 2024"
 output:
