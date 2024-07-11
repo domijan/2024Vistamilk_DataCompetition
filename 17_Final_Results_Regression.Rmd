@@ -31,9 +31,13 @@ sample <- specTrain$`sample number` |> unique()
 
 sample_te <- specTest$`sample number` |> unique()
 
-specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose content` )) 
+specTrain<- specTrain |> select(c(`412.71`: `5600.5`,`sample number`, `lactose content` )) 
 
-specTest<- specTest |> select(c(`412.71`: `3907.24`,`sample number`))
+specTest<- specTest |> select(c(`412.71`: `5600.5`,`sample number`))
+
+# specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose content` )) 
+# 
+# specTest<- specTest |> select(c(`412.71`: `3907.24`,`sample number`))
 
 set.seed(1951)
 path3 <- "data/Reference test dataset.xlsx"
@@ -69,7 +73,7 @@ truth <- dat.tr |>
 
   
 vi <- rf.fit$variable.importance |> sort(decreasing = TRUE) 
-write.csv(vi, "vi.csv")
+# write.csv(vi, "vi.csv")
 
   rf.pred.tr <- rf.fit |>   predict(data = x)
 
@@ -124,7 +128,8 @@ rf.pred <- rf.fit |> predict(data = xte)
 
 pred_table_te |> ggplot(aes(med.pred, `lactose content`)) + geom_point()
 calcRMSE( pred_table_te$med.pred,  pred_table_te$`lactose content`)
-# [1] 13.22541
+# [1] 13.22541 old range
+# [1] 12.69338 up to 5600
 ```
 
 
