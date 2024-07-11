@@ -1,0 +1,143 @@
+---
+title: "ML attempts"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-03"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(tidyverse)
+library(ranger)
+
+calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+substructure <- read.csv("surface.csv")
+substructure |> glimpse()
+substructure <- substructure |> rename(`sample number` = Sample)
+
+
+specTrain <- readRDS("specTrain.rds")
+specTest <- readRDS("specTest.rds")
+# specTest |> glimpse()
+
+
+specTrain<- specTrain |> left_join(substructure)
+specTest<- specTest |> left_join(substructure)
+
+
+sample <- specTrain$`sample number` |> unique()
+
+sample_te <- specTest$`sample number` |> unique()
+
+specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose content` , Surface)) 
+
+specTest<- specTest |> select(c(`412.71`: `3907.24`,`sample number`, Surface))
+
+set.seed(1951)
+path3 <- "data/Reference test dataset.xlsx"
+labelsTest <- readxl::read_excel(path3, sheet = readxl::excel_sheets(path3))
+
+```
+
+
+
+```{r}
+dat.tr <- specTrain 
+dat.te <- specTest
+
+tr.samp <- dat.tr |> select(`sample number`)
+dat.tr <- dat.tr |> select(-`sample number`)
+
+te.samp <- dat.te |> select(`sample number`)
+dat.te <- dat.te |> select(-`sample number`)
+
+
+truth <- dat.tr |> 
+  mutate(samp = tr.samp$`sample number`) |> 
+  group_by(samp) |> 
+  summarise(mn = mean(`lactose content`))
+
+
+  x <- model.matrix(`lactose content` ~. , data = dat.tr)
+  xte <- model.matrix( ~. , data = dat.te)
+    
+  y1 <- dat.tr$`lactose content`
+
+  rf.fit <- ranger(y = y1, x = x,  importance = "impurity")
+
+  
+vi <- rf.fit$variable.importance |> sort(decreasing = TRUE) 
+write.csv(vi, "viSurface.csv")
+
+  rf.pred.tr <- rf.fit |>   predict(data = x)
+
+  rf.pred <- rf.fit |> predict(data = xte)
+
+   pred_table <- tibble(pred =
+                         as.numeric(rf.pred.tr$predictions)) |> 
+    mutate(samp = tr.samp$`sample number`) |> 
+    group_by(samp) |> 
+    summarise(mn.pred = mean(pred), med.pred = median(pred)) |> 
+    left_join(truth)
+   
+  RF_pred <-  tibble(pred = as.numeric(rf.pred.tr$predictions)) |> 
+    mutate(samp = tr.samp$`sample number`)
+  
+    RF_pred |> ggplot(aes(x = samp, y = pred)) +geom_boxplot()
+   
+table(round(pred_table$med.pred), pred_table$mn)
+   
+calcRMSE( pred_table$mn,  pred_table$mn.pred)
+calcRMSE( pred_table$mn,  pred_table$med.pred)
+plot( pred_table$mn,  pred_table$mn.pred)
+abline(a = 0, b = 1)
+   
+points( pred_table$mn,  pred_table$med.pred, col = 2)
+```
+
+
+```{r}
+rf.pred <- rf.fit |> predict(data = xte)
+
+
+ pred_table <- tibble(pred =
+                         as.numeric(rf.pred.tr$predictions)) |> 
+    mutate(samp = tr.samp$`sample number`) |> 
+    group_by(samp) |> 
+    summarise(mn.pred = mean(pred), med.pred = median(pred)) |> 
+    left_join(truth)
+   
+ tibble(pred =
+                        as.numeric(rf.pred$predictions)) |> 
+    mutate(samp = te.samp$`sample number`) |> ggplot(aes(x = samp, y = pred)) +geom_boxplot()
+
+ pred_table_te <- tibble(pred =
+                        as.numeric(rf.pred$predictions)) |> 
+    mutate(samp = te.samp$`sample number`) |> 
+    group_by(samp) |> 
+    summarise(mn.pred = mean(pred), med.pred = median(pred), sd.pred = sd(pred)) |> 
+    left_join(labelsTest |> rename(samp = `sample number`))
+ 
+
+
+pred_table_te |> ggplot(aes(med.pred, `lactose content`)) + geom_point()
+calcRMSE( pred_table_te$med.pred,  pred_table_te$`lactose content`)
+# [1] 13.22541
+```
+
+
+```{r}
+tibble(pred =
+                        as.numeric(rf.pred$predictions)) |> 
+    mutate(samp = te.samp$`sample number`) |> ggplot(aes(samp, pred)) + geom_boxplot()
+  
+write.csv(pred_table_te, "KD_prediction2.csv")
+```

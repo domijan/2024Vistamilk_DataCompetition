@@ -1,0 +1,322 @@
+---
+title: Participant KD 
+authors:
+  - name: Katarina Domijan
+    department: Department of Mathematics and Statistics
+    affiliation: Maynooth University
+    email: katarina.domijan@mu.ie
+
+abstract: |
+  International Workshop on Spectroscopy and Chemometrics Data Competition
+keywords:
+  - Chemometrics 
+  - Fourier transform mid-infrared spectroscopy
+  - Machine learning 
+  - Milk quality
+bibliography: VM3references.bib
+biblio-style: unsrt
+output: rticles::arxiv_article
+---
+
+# Participant KD\label{sec:KD}
+
+
+```{r echo = FALSE, message=FALSE, warning=FALSE, results = 'hide'}
+library(tidyverse)
+library(broom)
+library(gridExtra)
+library(RColorBrewer)
+library(ggridges)
+calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+
+
+specTrain <- readRDS("specTrain.rds")
+medoiddat <- readRDS("medoiddat.rds")
+medoidtest <- readRDS("medoidtest.rds")
+path3 <- "data/Reference test dataset.xlsx"
+labelsTest <- readxl::read_excel(path3, sheet = readxl::excel_sheets(path3))
+
+labels <-specTrain |> select(c(`lactose content`, `sample number`))
+
+tbl <- sort(unique(labels$`lactose content`))
+```
+
+## Exploratory data analysis
+
+The number of pixels considered for each sample ranges from 112 to 300. No spatial information about the pixels was given and we assumed that each sample would contain a number of pixels that are not representative of the sample. 
+
+<!-- Figure  \ref{fig:fig2} shows spectra of medoids for each sample.  -->o 300. No spatial information about the pixels was given and we assumed that each sample would contain pixels that are not representative of the sample. Figure  \ref{fig:fig2} shows spectra of medoids for each sample. 
+
+
+<!-- ```{r fig1, echo = FALSE, fig.cap = "Spectra of medoids for each sample"} -->
+<!-- medoiddat|> -->
+<!--   pivot_longer(-c(`lactose content`, sample)) |> -->
+<!--   mutate(name = as.numeric(name)) |> -->
+<!--   ggplot(aes(x = name, y = value, group = sample, col = as.factor(`lactose content`))) + -->
+<!--   geom_line() + -->
+<!--   facet_wrap(~as.factor(`lactose content`)) +  -->
+<!--   theme(legend.position = "none") -->
+<!-- ``` -->
+
+
+Figure  \ref{fig:fig2} shows three principal components derived PC analysis [@pca] from the spectra of medoids for each sample. Each point in the plot represents a medoid of the sample projected on the PC subspace. The points are coloured by lactose content. The graph shows a pattern of lactose content across the PC subspace. 
+
+```{r fig2, echo = FALSE, fig.width = 6, fig.height = 2.3, fig.cap = "PCA from the spectra of medoids for each sample, coloured by lactose content."}
+pc <- medoiddat |> select(`412.71`: `3907.24`) |>
+  prcomp(center = TRUE,
+            scale. = TRUE)
+p1 <- pc |>
+  augment(medoiddat) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`))) +
+  geom_point()+ 
+  ylab("PC2") +
+  xlab("PC1") +
+  theme(legend.position = "none")
+
+p2 <- pc |>
+  augment(medoiddat) |>
+  ggplot(aes(.fittedPC1, .fittedPC3, color =(`lactose content`))) +
+  geom_point()+ 
+    ylab("PC3") +
+  xlab("PC1") +
+  theme(legend.position = "none")
+
+grid.arrange(p1, p2, nrow = 1)
+# library(scatterplot3d)
+# pcdat <- pc|> 
+#   augment(medoiddat)
+# scatterplot3d(pcdat$.fittedPC1, pcdat$.fittedPC2,  pcdat$.fittedPC3, color = pcdat$`lactose content`)
+
+# library(plotly)
+# plot_ly(pc|> 
+#   augment(medoiddat), x = ~.fittedPC1, y = ~.fittedPC2, z = ~.fittedPC3, color = ~ `lactose content`)
+
+```
+
+## Models
+
+The prediction was attempted as regression and classification problem. The latter was implemented by treating the eight lactose concentrations as categories rather than continuous measurements.
+
+Many earlier studies have benchmarked machine learning models for spectroscopic data, see for example @domijan23, @Singh2019, @Frizzarin2021b,@odwyer2021, @frizzarin2023. Informed by this, the following classification models were employed: random forests (RF) [@breiman01, @ranger], partial least squares (PLS) [@garthwaite1994, @pls], lasso [@Tibshirani1996,@glmnet] and linear discriminant analysis (LDA) [@MASS]. For regression models we considered: random forests (RF) [@breiman01, @ranger], support vector machines (SVM) for regression with a Gaussian kernel [@vapnik98],  partial least squares (PLS) [@garthwaite1994, @pls], lasso and elastic net (EN) [@Tibshirani1996, @Zou2005, @glmnet].
+
+In order to remove high noise regions we used wavelengths 412.71 - 3907.24 only. The full training set of 64 milk samples was split into 10 random splits of sample size 40 (training) and 24 (validation). The models were fitted to the randomly selected training (sub)-sets and the RMSE of the validation sets were compared.
+ 
+We considered using medoids for from each sample to build models, but better results were obtained when using all pixels from a sample. In this set up, sample information was not accounted for in the model training and all pixels are modeled as independent observations. Predictions were obtained for each pixel in the validation set and the prediction for each sample is obtained by taking the median prediction for the pixels in the sample.
+
+
+ 
+
+
+## Results
+
+
+Plots in figure \ref{fig:fig3} show root mean square error (RMSE) for the ten validation sets, each comprising 24 samples. The predictions  were obtained from regression and classification models trained on training subsets. The best performing model from this analysis appeared to be LDA (with the lowest average RMSE over the ten validation sets). 
+
+
+```{r  fig3, echo = FALSE, fig.width = 6, fig.height = 2.3, fig.cap = "RMSE for the validations sets from regression models (left) and classification models (right)."}
+RMSE <- readRDS("RMSEreg2.rds")
+colnames(RMSE) <- c( "LASSO" ,  "EN" ,"PLS15",         "PLS16" ,   "PLS17",         "PLS6" , "PLS7",         "PLS8" , "PLS9",         "PLS10" , "PLS11",         "PLS12" , "PLS13",         "PLS" ,"SVM",  "RF")
+RMSE3 <- RMSE  |>
+  as.data.frame() |>
+  select(c( "LASSO" ,  "EN" ,  "PLS" ,"SVM",  "RF")) |>
+  mutate(split = as.factor(1:10)) |>
+  pivot_longer(1:5)
+
+p1 <- RMSE3 |> 
+  group_by(name) |> 
+  mutate(meanv = mean(value)) |> 
+  ggplot(aes(x= reorder(name, meanv), y = value, color = split, group = split)) +
+  geom_point()+ geom_line() +
+  geom_line(aes(x = name, y = meanv), col = 1) +
+  theme(legend.position = "none") +
+  ylab("RMSE") +
+  ylim(c(0, 35)) +
+  xlab("")
+
+
+RMSE <- readRDS("RMSE5class.rds")
+RMSE3 <- RMSE  |>
+  as.data.frame() |>
+  mutate(split = as.factor(1:10)) |>
+  pivot_longer(1:4)
+
+p2 <-RMSE3 |> 
+  group_by(name) |> 
+  mutate(meanv = mean(value)) |> 
+  ggplot(aes(x= reorder(name, meanv), y = value, color = split, group = split)) +
+  geom_point()+ geom_line() +
+  geom_line(aes(x = name, y = meanv), col = 1) +
+  theme(legend.position = "none") +
+  ylab("RMSE") +
+  ylim(c(0, 35)) +
+  xlab("")
+
+grid.arrange(p1, p2, nrow = 1)
+```
+
+
+<!-- ## LDA subspace: training and testing data (predicted labels) -->
+
+
+```{r  echo = FALSE, message=FALSE, warning=FALSE}
+lda_tr <- readRDS("lda_tr.rds")
+lda_te <- readRDS("lda_te.rds")
+myColors <- brewer.pal(8, "Spectral")
+names(myColors) <- levels(lda_tr$Diet)
+custom_colors <- scale_colour_manual(name = "Species Names", values = myColors)
+
+
+```
+
+
+Two sets of results were submitted to the competition: predictions for the test set based on the LDA model and RF regression model. We also considered predictions from a RF for regression fitted to the data projected in the LDA subspace (RF + LDA). After the submission, the true labels of the test set samples were received. Lowest RMSE was achieved by LDA-RF (11.92), RF (13.22)  and then LDA (17). Figure \ref{fig:fig5} plots the lactose content for the eight test set samples and their predicted lactose content from LDA, RF and LDA-RF. It is clear that all three modelling approaches give similar predicted values, and that they all obtain poor predictions for samples with lactose content 24 and 60 (samples 42 and 50).
+Densities of predicted lactose content for the pixels in eight test set samples from the LDA-RF model are given in figure \ref{fig:fig5c}. We can see that the densities pf the pixel predictions are widest for samples 42 and 50, however, none of the pixels from sample 50 are predicted to have the correct lactose content of 60.  
+
+To investigate this further, figure \ref{fig:fig6} plots samples 42 and 50 (lactose content 24 and 60) from the testing set coloured by their predicted lactose content and their actual lactose content and the training set in the LDA subspace. We can see that the points representing spectra from pixels of samples 42 and 50 are located in different parts of the subspace from the training set points with the same lactose content. The misclassification occurs because of unusual spectra of these two samples, rather than deficit of predictive models. Similar information can be gleaned from plots of the training and testing data in the RF variable importance subspace (plots not shown). 
+
+
+
+<!-- ```{r fig5, echo = FALSE, out.width = "50%", fig.cap = "Predicted lactose content for the eight test set samples vs their measured lactose content."} -->
+<!-- predictions <- read.csv("KD_prediction_submitted.csv") -->
+
+<!-- predictions |> pivot_longer(PredictionsLDA:PredictionsLDA_RF, names_to = "model", values_to = "Prediction") |> ggplot(aes(x = lactose.content, y = Prediction, col = model)) + geom_point() + -->
+<!--   geom_abline(slope = 1, intercept = 0) -->
+
+<!-- ``` -->
+
+
+```{r fig5b, echo = FALSE, fig.width = 4.5, fig.height = 2.6, fig.cap = "Predicted lactose content for the eight test set samples vs their measured lactose content."}
+predictions <- read.csv("KD_prediction_submitted.csv")
+
+predictions |> pivot_longer(PredictionsLDA:PredictionsLDA_RF, names_to = "model", values_to = "Prediction") |> ggplot(aes(x = lactose.content, y = Prediction, col = model)) + geom_point() +
+  geom_abline(slope = 1, intercept = 0)
+```
+
+
+```{r fig5c, echo = FALSE, fig.width = 4.5, fig.height = 2.6, fig.cap = "Densities of predicted lactose content for the pixels in eight test set samples."}
+
+predPlot <- readRDS("predPlot.rds")
+# predPlot |>   ggplot(aes(x= pred,y= samp, fill=samp))+
+#       geom_density_ridges(alpha = 0.5,jittered_points = TRUE, point_alpha=1,point_shape=21)
+
+predPlot |>   ggplot(aes(x= pred,y= samp, fill=samp))+
+      geom_density_ridges()+
+  theme(legend.position = "none")+
+  ylab("Sample number")+
+  xlab("Prediction")
+
+```
+
+
+
+```{r fig6, echo = FALSE, message=FALSE, warning=FALSE, fig.cap = "Column 1: data from training set plotted in the LDA subspace. Column 2: samples 42 and 50 (lactose content 24 and 60) from the testing set coloured by their predicted lactose content. Column 3: samples 42 and 50 (lactose content 24 and 60) from the testing set coloured by their lactose content."}
+
+lda_te <- lda_te |> left_join(predictions |> rename(samp = sample))
+
+lda_te2 <- lda_te %>%
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60))
+
+p4 <- lda_tr %>%
+  ggplot(aes(x = LD1, y = LD2, col = Diet)) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-10, 30)) +
+  theme(legend.position = "none")+
+  custom_colors +
+  ggtitle("Training set\nlabels")
+
+p5 <- lda_te2 |>
+  ggplot(aes(x = LD1, y = LD2, col = as.factor(PredictionsLDA))) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-10, 30)) +
+  theme(legend.position = "none")+
+  custom_colors+
+  ggtitle("Testing set\nprediction")
+
+p5b <- lda_te2 |>
+  ggplot(aes(x = LD1, y = LD2, col = lactose.content)) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-10, 30)) +
+  theme(legend.position = "none")+
+  custom_colors+
+  ggtitle("Testing set\nlabels")
+
+p6 <- lda_tr %>%
+  ggplot(aes(x = LD3, y = LD4, col = Diet)) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-15, 10)) +
+  theme(legend.position = "none")+
+  custom_colors+
+  ggtitle("Training set\nlabels")
+
+
+p7 <- lda_te %>%
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60)) |>
+  ggplot(aes(x = LD3, y = LD4, col = as.factor(PredictionsLDA))) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-15, 10)) +
+  theme(legend.position = "none")+
+  custom_colors+
+  ggtitle("Testing set\nprediction")
+
+p7b <- lda_te %>%
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60)) |>
+  ggplot(aes(x = LD3, y = LD4, col = lactose.content)) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+  xlim(c(-15, 10)) +
+  theme(legend.position = "none")+
+  custom_colors+
+  ggtitle("Testing set\nlabels")
+
+p8 <- lda_tr %>%
+  ggplot(aes(x = LD5, y = LD6, col = Diet)) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+    xlim(c(-10, 6)) +
+  theme(legend.position = "none")+
+  custom_colors+
+  ggtitle("Training set\nlabels")
+
+p9 <- lda_te %>%
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60)) |>
+  ggplot(aes(x = LD5, y = LD6, col = as.factor(PredictionsLDA))) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+    xlim(c(-10, 6)) +
+  theme(legend.position = "none")+
+  custom_colors+
+  ggtitle("Testing set\nprediction")
+
+p9b <- lda_te %>%
+  mutate(lactose.content = as.factor(lactose.content))|>
+  filter(`lactose.content` %in% c(24,60)) |>
+  ggplot(aes(x = LD5, y = LD6, col = lactose.content)) +
+  geom_point(alpha = 0.1) +
+  ylim(c(-10, 10)) +
+    xlim(c(-10, 6)) +
+  theme(legend.position = "none")+
+  custom_colors+
+  ggtitle("Testing set\nlabels")
+
+grid.arrange(p4, p5, p5b,p6, p7,p7b,  p8, p9, p9b, nrow = 3)
+
+```
+
+
+
+
+
+
+
+
+All the analysis was done in R statistical software [@R].
+Code is available at https://github.com/domijan/2024Vistamilk_DataCompetition
