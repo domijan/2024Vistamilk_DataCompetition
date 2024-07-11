@@ -101,7 +101,6 @@ abline(a = 0, b = 1)
    
 points( pred_table$mn,  pred_table$med.pred, col = 2)
 
-  
 
 pred_table_te <- tibble(pred =
                         as.numeric(rf.pred$predictions)) |> 
@@ -117,4 +116,14 @@ tibble(pred = as.numeric(rf.pred$predictions)) |>
     mutate(samp = te.samp$`sample number`) |> ggplot(aes(samp, pred)) + geom_boxplot()
   
 write.csv(pred_table_te, "KD_prediction3.csv")
+
+ library(ggridges)
+
+predPlot <- tibble(pred =
+                         as.numeric(rf.pred$predictions)) |> 
+    mutate(samp = te.samp$`sample number`)
+
+ saveRDS(predPlot, "predPlot.rds")
+predPlot |>   ggplot(aes(x= pred,y= samp, fill=samp))+
+      geom_density_ridges(alpha = 0.5,jittered_points = TRUE, point_alpha=1,point_shape=21)
 ```
