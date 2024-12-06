@@ -48,12 +48,7 @@ tbl <- unique(dat$sample)
 ```
 
 
-<!-- ```{r} -->
-<!-- datt <- dat |>  -->
-<!--   filter(sample== tbl[1]) -->
 
-<!-- datt$mahalanobis <- mahalanobis(datt|> select(-sample), colMeans(datt|> select(-sample)), cov(datt|> select(-sample))) -->
-<!-- ``` -->
 
 ```{r fig.width= 2, fig.height= 2}
 library(GDAtools)
@@ -120,14 +115,6 @@ pc |>
   augment(medoiddat) |>
   ggplot(aes(.fittedPC1, .fittedPC3, color =(`lactose content`))) + 
   geom_point()
-
-library(GGally)
-pc |> 
-  augment(medoiddat) |> 
-  select(c(.fittedPC1: .fittedPC6, `lactose content`)) |>
-  ggpairs(columns = 1:6, aes(colour = as.factor(`lactose content`)))
-
-
 
 
 ```
