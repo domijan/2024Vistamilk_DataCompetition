@@ -23,8 +23,6 @@ calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
 
 specTrain <- readRDS("specTrain.rds")
 specTest <- readRDS("specTest.rds")
-# specTest |> glimpse()
-
 
 
 sample <- specTrain$`sample number` |> unique()
@@ -73,7 +71,7 @@ truth <- dat.tr |>
 
   
 vi <- rf.fit$variable.importance |> sort(decreasing = TRUE) 
-# write.csv(vi, "vi.csv")
+
 
   rf.pred.tr <- rf.fit |>   predict(data = x)
 
@@ -128,8 +126,6 @@ rf.pred <- rf.fit |> predict(data = xte)
 
 pred_table_te |> ggplot(aes(med.pred, `lactose content`)) + geom_point()
 calcRMSE( pred_table_te$med.pred,  pred_table_te$`lactose content`)
-# [1] 13.22541 old range
-# [1] 12.69338 up to 5600
 ```
 
 
