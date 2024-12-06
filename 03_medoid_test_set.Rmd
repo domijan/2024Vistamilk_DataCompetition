@@ -144,15 +144,15 @@ datt <- dat |>
   filter(sample== tbl[i])
 
 medoidtest <- rbind(medoidtest, datt[meds,])
-p1 <- datt|>
-  mutate(ID = 1:nrow(datt)) |>
-  pivot_longer(-c(ID, sample)) |>
-  mutate(name = as.numeric(name)) |>
-  mutate(medoid = as.factor(ID ==meds)) |>
-  ggplot(aes(x = name, y = value, group = ID, col = medoid)) +
-  geom_line(aes(alpha= medoid)) +
-  theme(legend.position="none")
-print(p1)
+# p1 <- datt|>
+#   mutate(ID = 1:nrow(datt)) |>
+#   pivot_longer(-c(ID, sample)) |>
+#   mutate(name = as.numeric(name)) |>
+#   mutate(medoid = as.factor(ID ==meds)) |>
+#   ggplot(aes(x = name, y = value, group = ID, col = medoid)) +
+#   geom_line(aes(alpha= medoid)) +
+#   theme(legend.position="none")
+# print(p1)
 }
 ```
 
