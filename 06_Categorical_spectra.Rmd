@@ -231,17 +231,9 @@ preds |>
   ggplot(aes(x = V1, y = value, col = name)) +
   geom_point()
 
-saveRDS(RMSE, "RMSE5class.rds")
+saveRDS(RMSE, "RMSEclass.rds")
 
-saveRDS(pred_table, "pred_tableclass5.rds")
+saveRDS(pred_table, "pred_tableclass.rds")
 plot(pred_table$mn,  pred_table$mn.pred)
 ```
 
-
-<!-- # A tibble: 4 × 3 -->
-<!--   name  meanv   sdv -->
-<!--   <chr> <dbl> <dbl> -->
-<!-- 1 RF     9.11  3.58 -->
-<!-- 2 LASSO  8.79  3.86 -->
-<!-- 3 PLS    7.08  4.07 -->
-<!-- 4 LDA    5.43  1.76 -->
