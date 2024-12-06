@@ -94,6 +94,7 @@ grid.arrange(p2, p1, nrow = 1)
 ```
 
 ```{r}
+library(ggthemes)
 
 pc <- medoids |> select(`412.71`: `3907.24`) |>
   prcomp(center = TRUE,
@@ -101,6 +102,17 @@ pc <- medoids |> select(`412.71`: `3907.24`) |>
 
 medoids <- medoids |>  mutate(label2 = label)
 medoids$label2[medoids$train=="train"] <- NA
+
+p <-  pc |>
+  augment(medoids) |>
+  ggplot(aes(.fittedPC1, .fittedPC2, color = Surface, pch = Surface)) +
+geom_point() +
+  ylab("PC2 (10%)") +
+  xlab("PC1 (80%)") 
+
+p + geom_text_repel(box.padding = 0.9, aes(label = label2)) + theme_classic()
+
+
 
 p1 <- pc |>
   augment(medoids) |>
@@ -121,6 +133,15 @@ p2 <- pc |>
 theme(legend.position = "none")
 
 grid.arrange(p1, p2, nrow = 1)
+
+ pc |>
+  augment(medoids) |>
+  ggplot(aes(.fittedPC7, .fittedPC8, color =(Surface), label = label2)) +
+  geom_point() +
+  geom_text_repel(box.padding = 0.5)+
+  ylab("PC3") +
+  xlab("PC1") +
+theme(legend.position = "none")
 
 
 ```
@@ -211,7 +232,7 @@ lda_meds <- lda_meds |> mutate(Surface=medoids$Surface,
 ```
 
 
-```{r}
+```{r eval = FALSE}
 p4 <- lda_meds %>%
   ggplot(aes(x = LD1, y = LD2, col = as.factor(lactose), label = label)) +
 geom_point() +
@@ -238,7 +259,7 @@ geom_point() +
 grid.arrange(p4, p5, p6, p7, nrow = 2)
 ```
 
-```{r}
+```{r eval = FALSE}
 p4 <- lda_meds %>%
   ggplot(aes(x = LD1, y = LD2, col = lactose, label = label)) +
 geom_point() +
@@ -272,7 +293,7 @@ grid.arrange(p4, p5, p6, p7, nrow = 2)
 
 
 
-```{r}
+```{r fig.height=9}
 p4 <- lda_meds %>%
   ggplot(aes(x = LD1, y = LD2, col = as.factor(lactose), label = label)) +
 geom_point() +
@@ -318,7 +339,7 @@ geom_point() +
 grid.arrange(p4, p7,p5, p8,p6, p9, nrow = 3)
 ```
 
-```{r}
+```{r fig.height=9}
 p4 <- lda_meds %>%
   ggplot(aes(x = LD1, y = LD2, col = lactose, label = label)) +
 geom_point() +

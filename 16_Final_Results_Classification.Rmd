@@ -78,6 +78,10 @@ dat.tr <- dat.tr |> rename(Diet = `lactose content`)
 # ===================================
 fit_lda <- MASS::lda(Diet ~ ., 
                dat.tr)
+
+# fit_lda
+# fit_lda$svd^2/sum(fit_lda$svd^2)*100
+
 pred_lda <- fit_lda |> 
   predict(dat.tr |> select(-Diet))
 
