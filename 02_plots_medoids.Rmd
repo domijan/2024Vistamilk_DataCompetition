@@ -21,10 +21,10 @@ path3 <- "data/test_dataset.xlsx"
 sheets <- excel_sheets(path)
 
 specTrain <- NULL
-for(i in 1:length(sheets)){
+for (i in 1:length(sheets)) {
   spec <- readxl::read_excel(path, sheet = sheets[i])
   spec <- spec |>
-  mutate(`sample number` = rep(sheets[i], nrow(spec)))
+    mutate(`sample number` = rep(sheets[i], nrow(spec)))
   specTrain <- rbind(specTrain, spec)
 }
 
@@ -37,14 +37,11 @@ tbl <- sort(unique(labels$`lactose content`))
 ```
 
 ```{r}
-dat <- specTrain |> select(c(`412.71`: `3907.24`, `sample number`))
+dat <- specTrain |> select(c(`412.71`:`3907.24`, `sample number`))
 
 
 dat <- dat |> rename(sample = `sample number`)
 tbl <- unique(dat$sample)
-
-
-
 ```
 
 
@@ -54,46 +51,47 @@ tbl <- unique(dat$sample)
 library(GDAtools)
 
 medoiddat <- NULL
-for (i in 1: length(tbl)){
-  
-d <- dist(dat|> filter(sample== tbl[i]) |> select(-sample))
-clus <- cutree(hclust(d), 1)
-meds <- medoids(d, clus )
+for (i in 1:length(tbl)) {
+  d <- dist(dat |> filter(sample == tbl[i]) |> select(-sample))
+  clus <- cutree(hclust(d), 1)
+  meds <- medoids(d, clus)
 
 
-datt <- dat |> 
-  filter(sample== tbl[i])
+  datt <- dat |>
+    filter(sample == tbl[i])
 
-medoiddat <- rbind(medoiddat, datt[meds,])
-p1 <- datt|>
-  mutate(ID = 1:nrow(datt)) |>
-  pivot_longer(-c(ID, sample)) |>
-  mutate(name = as.numeric(name)) |>
-  mutate(medoid = as.factor(ID ==meds)) |>
-  ggplot(aes(x = name, y = value, group = ID, col = medoid)) +
-  geom_line(aes(alpha= medoid)) +
-  theme(legend.position="none")
-print(p1)
+  medoiddat <- rbind(medoiddat, datt[meds, ])
+  p1 <- datt |>
+    mutate(ID = 1:nrow(datt)) |>
+    pivot_longer(-c(ID, sample)) |>
+    mutate(name = as.numeric(name)) |>
+    mutate(medoid = as.factor(ID == meds)) |>
+    ggplot(aes(x = name, y = value, group = ID, col = medoid)) +
+    geom_line(aes(alpha = medoid)) +
+    theme(legend.position = "none")
+  print(p1)
 }
 ```
 
 
 ```{r}
-medoiddat  <- medoiddat |> left_join(labels|> rename(sample = `sample number`))
+medoiddat <- medoiddat |> left_join(labels |> rename(sample = `sample number`))
 
-medoiddat|>
+medoiddat |>
   pivot_longer(-c(`lactose content`, sample)) |>
   mutate(name = as.numeric(name)) |>
   ggplot(aes(x = name, y = value, group = sample, col = as.factor(`lactose content`))) +
   geom_line() +
-  facet_wrap(~as.factor(`lactose content`))
-
+  facet_wrap(~ as.factor(`lactose content`))
 ```
 
 ```{r}
-pc <- medoiddat |> select(`412.71`: `3907.24`) |>
-  prcomp(center = TRUE,
-            scale. = TRUE)
+pc <- medoiddat |>
+  select(`412.71`:`3907.24`) |>
+  prcomp(
+    center = TRUE,
+    scale. = TRUE
+  )
 ```
 
 ```{r}
@@ -106,17 +104,15 @@ pc |>
 ```
 
 ```{r}
-pc |> 
+pc |>
   augment(medoiddat) |>
-  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`))) + 
+  ggplot(aes(.fittedPC1, .fittedPC2, color = (`lactose content`))) +
   geom_point()
 
-pc |> 
+pc |>
   augment(medoiddat) |>
-  ggplot(aes(.fittedPC1, .fittedPC3, color =(`lactose content`))) + 
+  ggplot(aes(.fittedPC1, .fittedPC3, color = (`lactose content`))) +
   geom_point()
-
-
 ```
 
 ```{r eval = FALSE}
