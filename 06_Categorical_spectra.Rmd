@@ -14,7 +14,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
 
 ```{r}
-
 library(tidyverse)
 library(broom)
 library(pls)
@@ -22,7 +21,9 @@ library(glmnet)
 library(ranger)
 
 
-calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+calcRMSE <- function(y, yhat) {
+  sqrt(mean((yhat - y)^2))
+}
 
 
 specTrain <- readRDS("specTrain.rds")
@@ -32,10 +33,7 @@ specTest <- readRDS("specTest.rds")
 
 sample <- specTrain$`sample number` |> unique()
 
-specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose content` )) 
-
-
-
+specTrain <- specTrain |> select(c(`412.71`:`3907.24`, `sample number`, `lactose content`))
 ```
 
 
@@ -58,175 +56,180 @@ random_split <- replicate(N, sample(length(sample), 40))
 
 
 ```{r}
-
 RMSE <- matrix(0, N, 4)
 predictions <- matrix(0, 24, 4)
 
 ########################################################
-for (i in 1:N){
+for (i in 1:N) {
   print(i)
   j <- 1
-dat.tr <- specTrain |> 
-  filter(`sample number` %in% sample[random_split[,i]])
-dat.te <- specTrain |> 
-  filter(`sample number` %in% sample[-random_split[,i]])
+  dat.tr <- specTrain |>
+    filter(`sample number` %in% sample[random_split[, i]])
+  dat.te <- specTrain |>
+    filter(`sample number` %in% sample[-random_split[, i]])
 
-dat.tr <- dat.tr |> select(-`sample number`)
+  dat.tr <- dat.tr |> select(-`sample number`)
 
-te.samp <- dat.te |> select(`sample number`)
-dat.te <- dat.te |> select(-`sample number`)
+  te.samp <- dat.te |> select(`sample number`)
+  dat.te <- dat.te |> select(-`sample number`)
 
-truth <- dat.te |> 
-  mutate(samp = te.samp) |> 
-  group_by(samp) |> 
-  summarise(mn = mean(`lactose content`))
+  truth <- dat.te |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn = mean(`lactose content`))
 
-dat.tr$`lactose content` <- as.factor(dat.tr$`lactose content`)
-dat.te$`lactose content` <- as.factor(dat.te$`lactose content`)
+  dat.tr$`lactose content` <- as.factor(dat.tr$`lactose content`)
+  dat.te$`lactose content` <- as.factor(dat.te$`lactose content`)
 
-dat.tr <- dat.tr |> rename(Diet = `lactose content`)
-dat.te <- dat.te |> rename(Diet = `lactose content`)
+  dat.tr <- dat.tr |> rename(Diet = `lactose content`)
+  dat.te <- dat.te |> rename(Diet = `lactose content`)
 
-########################################################
-set.seed(1951)
-  x <- model.matrix(Diet ~. , data = dat.tr)
-  xte = model.matrix(Diet ~. , data = dat.te)
+  ########################################################
+  set.seed(1951)
+  x <- model.matrix(Diet ~ ., data = dat.tr)
+  xte <- model.matrix(Diet ~ ., data = dat.te)
 
-fit_rf <- ranger::ranger(
-  y = dat.tr$Diet,
-  x = x,
-  data = dat.tr, 
-  importance = "impurity"
-)
+  fit_rf <- ranger::ranger(
+    y = dat.tr$Diet,
+    x = x,
+    data = dat.tr,
+    importance = "impurity"
+  )
 
-rf.pred <- fit_rf |> 
-  predict(data = xte)
+  rf.pred <- fit_rf |>
+    predict(data = xte)
 
 
- pred_table <- tibble(pred =
-                        as.numeric(as.character(rf.pred$predictions))) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(
+    pred =
+      as.numeric(as.character(rf.pred$predictions))
+  ) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
- 
 
-  # pred_table2 <- tibble(pred = rf.pred$predictions) |> 
-  #   mutate(samp = te.samp) |> 
-  #   group_by(samp) |> 
-  #   summarise(mn.pred =  as.numeric(names(which.max(table(pred))))) |> 
+
+  # pred_table2 <- tibble(pred = rf.pred$predictions) |>
+  #   mutate(samp = te.samp) |>
+  #   group_by(samp) |>
+  #   summarise(mn.pred =  as.numeric(names(which.max(table(pred))))) |>
   #   left_join(truth)
-   
-  RMSE[i,j] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+1
-  
-  
+
+  RMSE[i, j] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
+
   # ===================================
 
-fit_pls <- caret::plsda(
-  dat.tr |> select(-Diet), 
-  dat.tr$Diet, 
-  ncomp = 70)
+  fit_pls <- caret::plsda(
+    dat.tr |> select(-Diet),
+    dat.tr$Diet,
+    ncomp = 70
+  )
 
-  pred_pls <- fit_pls |> 
-  predict(dat.te |> select(-Diet))
-  
-   pred_table <- tibble(pred =
-                        as.numeric(as.character(pred_pls))) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_pls <- fit_pls |>
+    predict(dat.te |> select(-Diet))
+
+  pred_table <- tibble(
+    pred =
+      as.numeric(as.character(pred_pls))
+  ) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-   RMSE[i,j] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+1
-  
-  
-  # ===================================  
-   
-  
-cvfit <- cv.glmnet(x, dat.tr$Diet, family = "multinomial", nfolds = 5)
-# 
-# fit_lasso <- glmnet(x, dat.tr$Diet, family = "multinomial", lambda = cvfit$lambda.min)
 
-pred_lasso <- cvfit |> 
-  predict(xte, type = "class", s = "lambda.min")
+  RMSE[i, j] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
 
 
- pred_table <- tibble(pred =
-                        as.numeric(as.character(pred_lasso))) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  # ===================================
+
+
+  cvfit <- cv.glmnet(x, dat.tr$Diet, family = "multinomial", nfolds = 5)
+  #
+  # fit_lasso <- glmnet(x, dat.tr$Diet, family = "multinomial", lambda = cvfit$lambda.min)
+
+  pred_lasso <- cvfit |>
+    predict(xte, type = "class", s = "lambda.min")
+
+
+  pred_table <- tibble(
+    pred =
+      as.numeric(as.character(pred_lasso))
+  ) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-   RMSE[i,j] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+1
-  
-  
 
-  
-
-# ===================================
-fit_lda <- MASS::lda(Diet ~ ., 
-               dat.tr)
-pred_lda <- fit_lda |> 
-  predict(dat.te)
-
-pred_lda <- pred_lda$class
+  RMSE[i, j] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
 
 
- pred_table <- tibble(pred =
-                        as.numeric(as.character(pred_lda))) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+
+
+
+  # ===================================
+  fit_lda <- MASS::lda(
+    Diet ~ .,
+    dat.tr
+  )
+  pred_lda <- fit_lda |>
+    predict(dat.te)
+
+  pred_lda <- pred_lda$class
+
+
+  pred_table <- tibble(
+    pred =
+      as.numeric(as.character(pred_lda))
+  ) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-   RMSE[i,j] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+1
 
-   
-
-        
-
+  RMSE[i, j] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
 }
-
 ```
 
 ```{r}
-colnames(RMSE) <- c( "RF", "PLS", "LASSO" ,  "LDA")
-RMSE3 <- RMSE  |>
+colnames(RMSE) <- c("RF", "PLS", "LASSO", "LDA")
+RMSE3 <- RMSE |>
   as.data.frame() |>
   mutate(split = as.factor(1:10)) |>
   pivot_longer(1:4)
 
-RMSE3 |> 
-  group_by(name) |> 
-  mutate(meanv = mean(value)) |> 
-  ggplot(aes(x= reorder(name, meanv), y = value, color = split, group = split)) +
-  geom_point()+ geom_line() +
+RMSE3 |>
+  group_by(name) |>
+  mutate(meanv = mean(value)) |>
+  ggplot(aes(x = reorder(name, meanv), y = value, color = split, group = split)) +
+  geom_point() +
+  geom_line() +
   geom_line(aes(x = name, y = meanv), col = 1) +
   theme(legend.position = "none") +
   ylab("RMSE")
 
 
-t3 <- RMSE3 |> 
-  group_by(name) |> 
-  summarise(meanv = mean(value), sdv=sd(value)) |> 
+t3 <- RMSE3 |>
+  group_by(name) |>
+  summarise(meanv = mean(value), sdv = sd(value)) |>
   arrange(desc(meanv))
 
 t3
 
-preds <- as_tibble(predictions) 
+preds <- as_tibble(predictions)
 
-plot(truth = dat.te$`lactose content`, predictions[,17] )
+plot(truth = dat.te$`lactose content`, predictions[, 17])
 
-preds |> 
+preds |>
   pivot_longer(-V1) |>
   ggplot(aes(x = V1, y = value, col = name)) +
   geom_point()
@@ -234,6 +237,6 @@ preds |>
 saveRDS(RMSE, "RMSEclass.rds")
 
 saveRDS(pred_table, "pred_tableclass.rds")
-plot(pred_table$mn,  pred_table$mn.pred)
+plot(pred_table$mn, pred_table$mn.pred)
 ```
 
