@@ -131,8 +131,7 @@ tibble_test |>  ggplot(aes(x = samp, y = pred)) +geom_boxplot()
 pred_table_te |> ggplot(aes(`lactose content`, med.pred)) + geom_point()
 
 calcRMSE( pred_table_te$med.pred,  pred_table_te$`lactose content`)
-# [1] 17.00735
-# [1] 16.94845 with more wavelengths
+
 ```
 
 ```{r}
@@ -149,8 +148,7 @@ lda_te <- as_tibble(as.matrix(dat.te) %*% fit_lda$scaling)
 lda_te <- lda_te %>% mutate(samp = te.samp$`sample number`)
 lda_te <- lda_te |> left_join(pred_table_te)
 
-# saveRDS(lda_tr, "lda_tr.rds")
-# saveRDS(lda_te, "lda_te.rds")
+
 
 p4 <- lda_tr %>% 
   ggplot(aes(x = LD1, y = LD2, col = Diet)) + 
