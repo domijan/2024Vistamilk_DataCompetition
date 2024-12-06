@@ -15,7 +15,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 
 
 ```{r}
-
 library(tidyverse)
 library(broom)
 library(pls)
@@ -25,7 +24,9 @@ library(e1071)
 library(brnn)
 library(gbm)
 
-calcRMSE <- function(y, yhat){sqrt(mean((yhat - y)^2))}
+calcRMSE <- function(y, yhat) {
+  sqrt(mean((yhat - y)^2))
+}
 
 
 specTrain <- readRDS("specTrain.rds")
@@ -35,10 +36,7 @@ specTest <- readRDS("specTest.rds")
 
 sample <- specTrain$`sample number` |> unique()
 
-specTrain<- specTrain |> select(c(`412.71`: `3907.24`,`sample number`, `lactose content` )) 
-
-
-
+specTrain <- specTrain |> select(c(`412.71`:`3907.24`, `sample number`, `lactose content`))
 ```
 
 
@@ -61,295 +59,303 @@ random_split <- replicate(N, sample(length(sample), 40))
 
 
 ```{r}
-
 RMSE <- matrix(0, N, 16)
 predictions <- matrix(0, 24, 17)
 
 ########################################################
-for (i in 1:N){
+for (i in 1:N) {
   print(i)
   j <- 1
-dat.tr <- specTrain |> 
-  filter(`sample number` %in% sample[random_split[,i]])
-dat.te <- specTrain |> 
-  filter(`sample number` %in% sample[-random_split[,i]])
-dat.tr <- dat.tr |> select(-`sample number`)
-te.samp <- dat.te |> select(`sample number`)
-dat.te <- dat.te |> select(-`sample number`)
-truth <- dat.te |> mutate(samp = te.samp) |> group_by(samp) |> summarise(mn = mean(`lactose content`))
+  dat.tr <- specTrain |>
+    filter(`sample number` %in% sample[random_split[, i]])
+  dat.te <- specTrain |>
+    filter(`sample number` %in% sample[-random_split[, i]])
+  dat.tr <- dat.tr |> select(-`sample number`)
+  te.samp <- dat.te |> select(`sample number`)
+  dat.te <- dat.te |> select(-`sample number`)
+  truth <- dat.te |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn = mean(`lactose content`))
 
-########################################################
-set.seed(1951)
-  x <- model.matrix(`lactose content` ~. , data = dat.tr)
-
-  y1 <- dat.tr$`lactose content`
-
-  grid <- 10^seq(-3, 3, length = 100)
-
-  lasso.fit <- glmnet(x,y1,alpha=1, lambda = grid) # for
-  cv.out <- cv.glmnet(x,y1,alpha=1)
-
-  lasso.fit <- glmnet(x,y1,alpha=1,
-                      lambda = cv.out$lambda.min)
-
-  lasso.pred <- predict(lasso.fit, newx = model.matrix(`lactose content` ~. , data = dat.te))
-  
- pred_table <- tibble(pred = as.numeric(lasso.pred)) |> mutate(samp = te.samp) |> group_by(samp) |> summarise(mn.pred = median(pred)) |> left_join(truth)
- 
-  predictions[,j] <- pred_table$mn
-  j <- j + 1
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j + 1
-  
   ########################################################
-set.seed(1951)
-  x <- model.matrix(`lactose content` ~. , data = dat.tr)
+  set.seed(1951)
+  x <- model.matrix(`lactose content` ~ ., data = dat.tr)
 
   y1 <- dat.tr$`lactose content`
 
   grid <- 10^seq(-3, 3, length = 100)
 
-  lasso.fit <- glmnet(x,y1,alpha=0.5, lambda = grid) # for
-  cv.out <- cv.glmnet(x,y1,alpha=0.5)
+  lasso.fit <- glmnet(x, y1, alpha = 1, lambda = grid) # for
+  cv.out <- cv.glmnet(x, y1, alpha = 1)
 
-  lasso.fit <- glmnet(x,y1,alpha=0.5,
-                      lambda = cv.out$lambda.min)
+  lasso.fit <- glmnet(x, y1,
+    alpha = 1,
+    lambda = cv.out$lambda.min
+  )
 
-  lasso.pred <- predict(lasso.fit, newx = model.matrix(`lactose content` ~. , data = dat.te))
+  lasso.pred <- predict(lasso.fit, newx = model.matrix(`lactose content` ~ ., data = dat.te))
 
-  
-  pred_table <- tibble(pred = as.numeric(lasso.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(lasso.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  
+
+  predictions[, j] <- pred_table$mn
   j <- j + 1
- ######################################################## 
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
+  ########################################################
   set.seed(1951)
-  pls.fit <- plsr(`lactose content` ~., data = dat.tr, scale= TRUE, validation = "CV")
+  x <- model.matrix(`lactose content` ~ ., data = dat.tr)
+
+  y1 <- dat.tr$`lactose content`
+
+  grid <- 10^seq(-3, 3, length = 100)
+
+  lasso.fit <- glmnet(x, y1, alpha = 0.5, lambda = grid) # for
+  cv.out <- cv.glmnet(x, y1, alpha = 0.5)
+
+  lasso.fit <- glmnet(x, y1,
+    alpha = 0.5,
+    lambda = cv.out$lambda.min
+  )
+
+  lasso.pred <- predict(lasso.fit, newx = model.matrix(`lactose content` ~ ., data = dat.te))
+
+
+  pred_table <- tibble(pred = as.numeric(lasso.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
+    left_join(truth)
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+
+  j <- j + 1
+  ########################################################
+  set.seed(1951)
+  pls.fit <- plsr(`lactose content` ~ ., data = dat.tr, scale = TRUE, validation = "CV")
 
   pls.pred <- predict(pls.fit, dat.te, ncomp = 15)
 
-    pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
 
   pls.pred <- predict(pls.fit, dat.te, ncomp = 16)
-  
-    pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
-    left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
-  pls.pred <- predict(pls.fit, dat.te, ncomp = 17
-                      )
 
-      pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
+  pls.pred <- predict(pls.fit, dat.te, ncomp = 17)
+
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
+    left_join(truth)
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 6)
 
-      pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 7)
 
-     pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 8)
 
-     pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 9)
 
-      pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 10)
 
-      pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 11)
 
-      pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 12)
 
-      pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 13)
 
-      pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
-  
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
   pls.pred <- predict(pls.fit, dat.te, ncomp = 14)
 
-     pred_table <- tibble(pred = as.numeric(pls.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  pred_table <- tibble(pred = as.numeric(pls.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+ 1
 
-  
-    ########################################################
-set.seed(1951)
-  svm.fit <- svm(dat.tr$`lactose content`~.,dat.tr)
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
 
-  #Predict using SVM regression
-  svm.pred <- predict(svm.fit, dat.te)
-    pred_table <- tibble(pred = as.numeric(svm.pred)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
-    left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+1
+
   ########################################################
-set.seed(1951)
-  rf.fit <- ranger(y = dat.tr$`lactose content`, x = x,  importance = "impurity")
+  set.seed(1951)
+  svm.fit <- svm(dat.tr$`lactose content` ~ ., dat.tr)
 
-  rf.pred <- predict(rf.fit , data = model.matrix(`lactose content` ~. , data = dat.te))
-
-    pred_table <- tibble(pred = as.numeric(rf.pred$predictions)) |> 
-    mutate(samp = te.samp) |> 
-    group_by(samp) |> 
-    summarise(mn.pred = median(pred)) |> 
+  # Predict using SVM regression
+  svm.pred <- predict(svm.fit, dat.te)
+  pred_table <- tibble(pred = as.numeric(svm.pred)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
     left_join(truth)
-   
-  RMSE[i,j-1] <- calcRMSE( pred_table$mn,  pred_table$mn.pred)
-  predictions[,j] <- pred_table$mn.pred
-  j <- j+1
-  
-      ####################################################
 
-        j <- j+1
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+  ########################################################
+  set.seed(1951)
+  rf.fit <- ranger(y = dat.tr$`lactose content`, x = x, importance = "impurity")
 
+  rf.pred <- predict(rf.fit, data = model.matrix(`lactose content` ~ ., data = dat.te))
+
+  pred_table <- tibble(pred = as.numeric(rf.pred$predictions)) |>
+    mutate(samp = te.samp) |>
+    group_by(samp) |>
+    summarise(mn.pred = median(pred)) |>
+    left_join(truth)
+
+  RMSE[i, j - 1] <- calcRMSE(pred_table$mn, pred_table$mn.pred)
+  predictions[, j] <- pred_table$mn.pred
+  j <- j + 1
+
+  ####################################################
+
+  j <- j + 1
 }
-
 ```
 
 ```{r}
-colnames(RMSE) <- c( "LASSO" ,  "EN" ,"PLS15",         "PLS16" ,   "PLS17",         "PLS6" , "PLS7",         "PLS8" , "PLS9",         "PLS10" , "PLS11",         "PLS12" , "PLS13",         "PLS14" ,"SVM",  "RF")
-RMSE3 <- RMSE  |>
+colnames(RMSE) <- c("LASSO", "EN", "PLS15", "PLS16", "PLS17", "PLS6", "PLS7", "PLS8", "PLS9", "PLS10", "PLS11", "PLS12", "PLS13", "PLS14", "SVM", "RF")
+RMSE3 <- RMSE |>
   as.data.frame() |>
   mutate(split = as.factor(1:10)) |>
   pivot_longer(1:16)
 
-RMSE3 |> 
-  group_by(name) |> 
-  mutate(meanv = mean(value)) |> 
-  ggplot(aes(x= reorder(name, meanv), y = value, color = split, group = split)) +
-  geom_point()+ geom_line() +
+RMSE3 |>
+  group_by(name) |>
+  mutate(meanv = mean(value)) |>
+  ggplot(aes(x = reorder(name, meanv), y = value, color = split, group = split)) +
+  geom_point() +
+  geom_line() +
   geom_line(aes(x = name, y = meanv), col = 1) +
   theme(legend.position = "none") +
   ylab("RMSE")
 
 
-t3 <- RMSE3 |> 
-  group_by(name) |> 
-  summarise(meanv = mean(value), sdv=sd(value)) |> 
+t3 <- RMSE3 |>
+  group_by(name) |>
+  summarise(meanv = mean(value), sdv = sd(value)) |>
   arrange(desc(meanv))
 
-preds <- as_tibble(predictions) 
+preds <- as_tibble(predictions)
 
-plot(truth = dat.te$`lactose content`, predictions[,17] )
+plot(truth = dat.te$`lactose content`, predictions[, 17])
 
-preds |> 
+preds |>
   pivot_longer(-V1) |>
   ggplot(aes(x = V1, y = value, col = name)) +
   geom_point()
 
 
-plot(pred_table$mn,  pred_table$mn.pred)
+plot(pred_table$mn, pred_table$mn.pred)
 ```
